@@ -32,3 +32,44 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+model CreatorMapping {
+  id                   Int      @id @default(autoincrement())
+  shopifyCollectionId  String   @unique
+  collectionName       String
+  discourseUrl         String
+  connectionSecret     String
+  enabled              Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([shopifyCollectionId])
+}
+
+model ProcessedWebhook {
+  id           Int       @id @default(autoincrement())
+  webhookId    String    @unique
+  orderId      String
+  eventType    String
+  status       String    @default("processed")
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
+
+  @@index([webhookId])
+  @@index([orderId])
+}
+
+model DeliveryLog {
+  id                Int       @id @default(autoincrement())
+  orderId           String
+  customerEmail     String
+  productId         String
+  discourseCommunity String
+  status            String    @default("pending")
+  errorMessage      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([customerEmail])
+}
