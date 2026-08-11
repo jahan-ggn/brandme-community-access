@@ -29,7 +29,7 @@ api_version = "2026-10"
   uri = "/webhooks/refunds/create"
   topics = ["refunds/create"]
 
-  # Handled by: /app/routes/webhooks.collections.updated.tsx
+  # Handled by: /app/routes/webhooks.collections.update.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/collections/update"
   topics = ["collections/update"]
