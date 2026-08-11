@@ -24,7 +24,7 @@ api_version = "2026-10"
   uri = "/webhooks/orders/paid"
   topics = ["orders/paid"]
 
-  # Handled by: /app/routes/webhooks.refunds.created.tsx
+  # Handled by: /app/routes/webhooks.refunds.create.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/refunds/create"
   topics = ["refunds/create"]
