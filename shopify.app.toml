@@ -1,38 +1,36 @@
-# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
-
 client_id = "4a0c7e2faa4855bc620fb14528c08cbd"
 name = "brandme-community-access"
 application_url = "https://example.com"
 embedded = true
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_products,read_orders,read_customers"
 
 [webhooks]
 api_version = "2026-10"
 
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
   topics = [ "app/uninstalled" ]
 
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/scopes_update"
-  topics = [ "app/scopes_update" ]
+  topics = ["app/scopes_update"]
 
-  # Handled by: /app/routes/webhooks.orders.created.tsx
+  # Handled by: /app/routes/webhooks.orders.paid.tsx
   [[webhooks.subscriptions]]
-  uri = "/webhooks/orders/create"
-  topics = ["orders/create"]
+  uri = "/webhooks/orders/paid"
+  topics = ["orders/paid"]
 
-  # Handled by: /app/routes/webhooks.refunds.created.tsx
+   # Handled by: /app/routes/webhooks.refunds.created.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/refunds/create"
   topics = ["refunds/create"]
 
-
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = ["https://example.com/api/auth"]
 
 [build]
 include_config_on_deploy = true
