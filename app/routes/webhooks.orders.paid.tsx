@@ -1,16 +1,35 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import {
+  isDuplicateWebhook,
+  markWebhookProcessed,
+} from "../utils/webhook-helpers.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { topic, shop, payload } = await authenticate.webhook(request);
+  const { topic, shop, payload, webhookId } =
+    await authenticate.webhook(request);
 
-  const webhookId = request.headers.get("x-shopify-webhook-id") || "";
   console.log(
     `Received ${topic} webhook for ${shop} (webhook ID: ${webhookId})`,
   );
 
-  // TODO: Step 4 — deduplicate via ProcessedWebhook table
-  // TODO: Step 5 — determine creator collection and route to Discourse
+  if (await isDuplicateWebhook(webhookId)) {
+    console.log(`Ignoring duplicate webhook ${webhookId}`);
+    return new Response();
+  }
+
+  const orderId = payload?.id?.toString() ?? "";
+
+  // TODO: Step 5
+  // 1. Read purchased products
+  // 2. Determine creator collection
+  // 3. Find CreatorMapping
+  // 4. Forward event to correct Discourse plugin
+  // 5. Create delivery log
+
+  // IMPORTANT:
+  // Only mark the webhook processed after all required processing succeeds.
+  await markWebhookProcessed(webhookId, shop, orderId, "orders/paid");
 
   return new Response();
 };

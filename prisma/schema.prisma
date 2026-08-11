@@ -1,75 +1,73 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "sqlite"
   url      = "file:dev.sqlite"
 }
 
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
 
 model CreatorMapping {
-  id                   Int      @id @default(autoincrement())
-  shopifyCollectionId  String   @unique
-  collectionName       String
-  discourseUrl         String
-  connectionSecret     String
-  enabled              Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                  Int      @id @default(autoincrement())
+  shop                String
+  shopifyCollectionId String
+  collectionName      String
+  discourseUrl        String
+  connectionSecret    String
+  enabled             Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  @@index([shopifyCollectionId])
+  @@unique([shop, shopifyCollectionId])
 }
 
 model ProcessedWebhook {
-  id           Int       @id @default(autoincrement())
-  webhookId    String    @unique
-  orderId      String
-  eventType    String
-  status       String    @default("processed")
-  createdAt    DateTime  @default(now())
-  processedAt  DateTime?
+  id          Int       @id @default(autoincrement())
+  webhookId   String    @unique
+  shop        String
+  orderId     String
+  eventType   String
+  status      String    @default("processed")
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
 
-  @@index([webhookId])
+  @@index([shop])
   @@index([orderId])
 }
 
 model DeliveryLog {
-  id                Int       @id @default(autoincrement())
-  orderId           String
-  customerEmail     String
-  productId         String
+  id                 Int      @id @default(autoincrement())
+  shop               String
+  orderId            String
+  customerEmail      String
+  productId          String
   discourseCommunity String
-  status            String    @default("pending")
-  errorMessage      String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  status             String   @default("pending")
+  errorMessage       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
+  @@index([shop])
   @@index([orderId])
   @@index([customerEmail])
 }
