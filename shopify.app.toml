@@ -24,10 +24,15 @@ api_version = "2026-10"
   # uri = "/webhooks/orders/paid"
   # topics = ["orders/paid"]
 
-   # Handled by: /app/routes/webhooks.refunds.created.tsx
+  # Handled by: /app/routes/webhooks.refunds.created.tsx
   # [[webhooks.subscriptions]]
   # uri = "/webhooks/refunds/create"
   # topics = ["refunds/create"]
+
+  # Handled by: /app/routes/webhooks.collections.updated.tsx
+  # [[webhooks.subscriptions]]
+  # uri = "/webhooks/collections/update"
+  # topics = ["collections/update"]
 
 [auth]
 redirect_urls = ["https://example.com/api/auth"]

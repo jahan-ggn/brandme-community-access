@@ -11,14 +11,14 @@ export async function isDuplicateWebhook(webhookId: string): Promise<boolean> {
 export async function markWebhookProcessed(
   webhookId: string,
   shop: string,
-  orderId: string,
+  resourceId: string,
   eventType: string,
 ): Promise<void> {
   await db.processedWebhook.create({
     data: {
       webhookId,
       shop,
-      orderId,
+      resourceId,
       eventType,
       status: "processed",
       processedAt: new Date(),

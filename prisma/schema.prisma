@@ -28,31 +28,47 @@ model Session {
 }
 
 model CreatorMapping {
-  id                  Int      @id @default(autoincrement())
+  id                  Int              @id @default(autoincrement())
   shop                String
   shopifyCollectionId String
   collectionName      String
   discourseUrl        String
   connectionSecret    String
-  enabled             Boolean  @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  enabled             Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  products            ProductMapping[]
 
   @@unique([shop, shopifyCollectionId])
+}
+
+model ProductMapping {
+  id               Int            @id @default(autoincrement())
+  shop             String
+  shopifyProductId String
+  creatorMapping   CreatorMapping @relation(fields: [creatorMappingId], references: [id], onDelete: Cascade)
+  creatorMappingId Int
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([creatorMappingId, shopifyProductId])
+  @@index([shop, shopifyProductId])
+  @@index([creatorMappingId])
 }
 
 model ProcessedWebhook {
   id          Int       @id @default(autoincrement())
   webhookId   String    @unique
   shop        String
-  orderId     String
+  resourceId     String
   eventType   String
   status      String    @default("processed")
   createdAt   DateTime  @default(now())
   processedAt DateTime?
 
   @@index([shop])
-  @@index([orderId])
+  @@index([resourceId])
 }
 
 model DeliveryLog {
