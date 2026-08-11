@@ -20,19 +20,19 @@ api_version = "2026-10"
   topics = ["app/scopes_update"]
 
   # Handled by: /app/routes/webhooks.orders.paid.tsx
-  # [[webhooks.subscriptions]]
-  # uri = "/webhooks/orders/paid"
-  # topics = ["orders/paid"]
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = ["orders/paid"]
 
   # Handled by: /app/routes/webhooks.refunds.created.tsx
-  # [[webhooks.subscriptions]]
-  # uri = "/webhooks/refunds/create"
-  # topics = ["refunds/create"]
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/refunds/create"
+  topics = ["refunds/create"]
 
   # Handled by: /app/routes/webhooks.collections.updated.tsx
-  # [[webhooks.subscriptions]]
-  # uri = "/webhooks/collections/update"
-  # topics = ["collections/update"]
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/collections/update"
+  topics = ["collections/update"]
 
 [auth]
 redirect_urls = ["https://example.com/api/auth"]

@@ -1,5 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import { useEffect, useRef } from "react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
@@ -223,7 +225,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       return {
         success: true,
-        synced: syncResult.synced,
+        message: `Mapping created. ${syncResult.synced} product${
+          syncResult.synced === 1 ? "" : "s"
+        } synced.`,
       };
     } catch (error) {
       await db.creatorMapping.delete({
@@ -297,7 +301,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     return {
       success: true,
-      message: "Mapping updated",
+      message: "Mapping updated.",
     };
   }
 
@@ -323,18 +327,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
+    const enabled = !mapping.enabled;
+
     await db.creatorMapping.update({
       where: {
         id: mapping.id,
       },
       data: {
-        enabled: !mapping.enabled,
+        enabled,
       },
     });
 
     return {
       success: true,
-      message: `Mapping ${!mapping.enabled ? "enabled" : "disabled"}`,
+      message: `Mapping ${enabled ? "enabled" : "disabled"}.`,
     };
   }
 
@@ -368,7 +374,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     return {
       success: true,
-      message: "Mapping deleted",
+      message: "Mapping deleted.",
     };
   }
 
@@ -411,8 +417,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return {
         success: true,
         message:
-          `Re-synced: ${syncResult.synced} added, ` +
-          `${syncResult.removed} removed`,
+          `Re-synced successfully. ` +
+          `${syncResult.synced} added, ${syncResult.removed} removed.`,
       };
     } catch (error) {
       console.error(`Failed to re-sync ${mapping.collectionName}`, error);
@@ -435,79 +441,76 @@ export default function MappingsPage() {
   const { mappings, collections } = useLoaderData<typeof loader>();
 
   const fetcher = useFetcher<typeof action>();
+  const revalidator = useRevalidator();
+  const shopify = useAppBridge();
+
+  const previousFetcherState = useRef(fetcher.state);
 
   const data = fetcher.data;
 
   const error = data && "error" in data ? data.error : undefined;
 
-  const success = data && "success" in data ? data.success : false;
-
-  const message = data && "message" in data ? data.message : undefined;
-
-  const synced = data && "synced" in data ? data.synced : undefined;
-
   const isSubmitting = fetcher.state !== "idle";
+
+  useEffect(() => {
+    const wasBusy = previousFetcherState.current !== "idle";
+    const isNowIdle = fetcher.state === "idle";
+
+    if (wasBusy && isNowIdle && fetcher.data) {
+      if ("success" in fetcher.data && fetcher.data.success) {
+        const message =
+          "message" in fetcher.data && fetcher.data.message
+            ? fetcher.data.message
+            : "Operation completed successfully.";
+
+        shopify.toast.show(message);
+
+        revalidator.revalidate();
+      }
+    }
+
+    previousFetcherState.current = fetcher.state;
+  }, [fetcher.state, fetcher.data, shopify, revalidator]);
 
   return (
     <s-page heading="Creator Community Mappings">
       <s-section heading="Add a new mapping">
         {error && (
           <s-banner tone="critical">
-            <p>{error}</p>
-          </s-banner>
-        )}
-
-        {success && (
-          <s-banner tone="success">
-            <p>
-              {message ?? "Mapping created successfully."}
-
-              {typeof synced === "number"
-                ? ` ${synced} products were synced.`
-                : ""}
-            </p>
+            <s-paragraph>{error}</s-paragraph>
           </s-banner>
         )}
 
         <fetcher.Form method="post">
           <input type="hidden" name="intent" value="create" />
-          {collections.length === 0 ? (
-            <s-paragraph>
-              No Shopify collections found. Create a collection in Shopify Admin
-              first.
-            </s-paragraph>
-          ) : (
+
+          <s-stack direction="block" gap="base">
             <s-select
               name="shopifyCollectionId"
               label="Shopify Collection"
+              placeholder="Select a collection…"
               required
             >
-              <option value="">Select a collection…</option>
               {collections.map((collection) => (
-                <option
+                <s-option
                   key={collection.id}
                   value={collection.id}
                   disabled={collection.alreadyMapped}
                 >
                   {collection.title}
                   {collection.alreadyMapped ? " (already mapped)" : ""}
-                </option>
+                </s-option>
               ))}
             </s-select>
-          )}
 
-          <s-stack direction="block" gap="base">
-            <s-url-field
+            <s-text-field
               name="discourseUrl"
               label="Discourse Community URL"
               placeholder="https://community.example.com"
               required
             />
 
-            <s-button
-              type="submit"
-              disabled={isSubmitting || collections.length === 0}
-            >
+            <s-button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Creating…" : "Create mapping"}
             </s-button>
           </s-stack>
@@ -519,84 +522,86 @@ export default function MappingsPage() {
           <s-paragraph>No mappings yet. Create one above.</s-paragraph>
         ) : (
           <s-table>
-            <s-table-row>
-              <s-table-cell>Creator</s-table-cell>
+            <s-table-header-row>
+              <s-table-header>Creator</s-table-header>
 
-              <s-table-cell>Discourse URL</s-table-cell>
+              <s-table-header>Discourse URL</s-table-header>
 
-              <s-table-cell>Products</s-table-cell>
+              <s-table-header>Products</s-table-header>
 
-              <s-table-cell>Status</s-table-cell>
+              <s-table-header>Status</s-table-header>
 
-              <s-table-cell>Created</s-table-cell>
+              <s-table-header>Created</s-table-header>
 
-              <s-table-cell>Actions</s-table-cell>
-            </s-table-row>
+              <s-table-header>Actions</s-table-header>
+            </s-table-header-row>
 
-            {mappings.map((mapping) => (
-              <s-table-row key={mapping.id}>
-                <s-table-cell>{mapping.collectionName}</s-table-cell>
+            <s-table-body>
+              {mappings.map((mapping) => (
+                <s-table-row key={mapping.id}>
+                  <s-table-cell>{mapping.collectionName}</s-table-cell>
 
-                <s-table-cell>{mapping.discourseUrl}</s-table-cell>
+                  <s-table-cell>{mapping.discourseUrl}</s-table-cell>
 
-                <s-table-cell>{mapping.productCount}</s-table-cell>
+                  <s-table-cell>{mapping.productCount}</s-table-cell>
 
-                <s-table-cell>
-                  {mapping.enabled ? "Enabled" : "Disabled"}
-                </s-table-cell>
+                  <s-table-cell>
+                    {mapping.enabled ? "Enabled" : "Disabled"}
+                  </s-table-cell>
 
-                <s-table-cell>
-                  {new Date(mapping.createdAt).toLocaleDateString()}
-                </s-table-cell>
+                  <s-table-cell>
+                    {new Date(mapping.createdAt).toLocaleDateString()}
+                  </s-table-cell>
 
-                <s-table-cell>
-                  <s-stack direction="inline" gap="base">
-                    <fetcher.Form method="post" style={{ display: "inline" }}>
-                      <input type="hidden" name="intent" value="toggle" />
+                  <s-table-cell>
+                    <s-stack direction="inline" gap="base">
+                      <fetcher.Form method="post" style={{ display: "inline" }}>
+                        <input type="hidden" name="intent" value="toggle" />
 
-                      <input type="hidden" name="id" value={mapping.id} />
+                        <input type="hidden" name="id" value={mapping.id} />
 
-                      <s-button
-                        type="submit"
-                        variant="tertiary"
-                        disabled={isSubmitting}
-                      >
-                        {mapping.enabled ? "Disable" : "Enable"}
-                      </s-button>
-                    </fetcher.Form>
+                        <s-button
+                          type="submit"
+                          variant="tertiary"
+                          disabled={isSubmitting}
+                        >
+                          {mapping.enabled ? "Disable" : "Enable"}
+                        </s-button>
+                      </fetcher.Form>
 
-                    <fetcher.Form method="post" style={{ display: "inline" }}>
-                      <input type="hidden" name="intent" value="resync" />
+                      <fetcher.Form method="post" style={{ display: "inline" }}>
+                        <input type="hidden" name="intent" value="resync" />
 
-                      <input type="hidden" name="id" value={mapping.id} />
+                        <input type="hidden" name="id" value={mapping.id} />
 
-                      <s-button
-                        type="submit"
-                        variant="tertiary"
-                        disabled={isSubmitting}
-                      >
-                        Re-sync
-                      </s-button>
-                    </fetcher.Form>
+                        <s-button
+                          type="submit"
+                          variant="tertiary"
+                          disabled={isSubmitting}
+                        >
+                          Re-sync
+                        </s-button>
+                      </fetcher.Form>
 
-                    <fetcher.Form method="post" style={{ display: "inline" }}>
-                      <input type="hidden" name="intent" value="delete" />
+                      <fetcher.Form method="post" style={{ display: "inline" }}>
+                        <input type="hidden" name="intent" value="delete" />
 
-                      <input type="hidden" name="id" value={mapping.id} />
+                        <input type="hidden" name="id" value={mapping.id} />
 
-                      <s-button
-                        type="submit"
-                        variant="tertiary"
-                        tone="critical"
-                        disabled={isSubmitting}
-                      >
-                        Delete
-                      </s-button>
-                    </fetcher.Form>
-                  </s-stack>
-                </s-table-cell>
-              </s-table-row>
-            ))}
+                        <s-button
+                          type="submit"
+                          variant="tertiary"
+                          tone="critical"
+                          disabled={isSubmitting}
+                        >
+                          Delete
+                        </s-button>
+                      </fetcher.Form>
+                    </s-stack>
+                  </s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
           </s-table>
         )}
       </s-section>
