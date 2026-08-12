@@ -34,6 +34,11 @@ api_version = "2025-10"
   uri = "/webhooks/collections/update"
   topics = ["collections/update"]
 
+  # Handled by: /app/routes/webhooks.products.update.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/update"
+  topics = ["products/update"]
+
 [auth]
 redirect_urls = ["https://example.com/api/auth"]
 
