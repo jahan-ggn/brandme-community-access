@@ -89,3 +89,23 @@ model DeliveryLog {
   @@index([orderId])
   @@index([customerEmail])
 }
+
+model RetryQueue {
+  id               Int       @id @default(autoincrement())
+  shop             String
+  orderId          String
+  customerEmail    String
+  productId        String
+  discourseUrl    String
+  connectionSecret String
+  eventType        String
+  attemptCount     Int       @default(0)
+  maxAttempts      Int       @default(5)
+  nextRetryAt      DateTime  @default(now())
+  lastError        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([nextRetryAt])
+  @@index([shop])
+}

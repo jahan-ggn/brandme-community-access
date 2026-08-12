@@ -11,6 +11,7 @@ import {
 
 import { forwardToDiscourse } from "../utils/discourse-forwarder.server";
 import { logger } from "../utils/logger.server";
+import { enqueueRetry } from "../utils/retry-queue.server";
 
 type RefundLineItemEntry = {
   product_id: number | string | null;
@@ -160,6 +161,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
 
         if (!result.success) {
+          await enqueueRetry(
+            shop,
+            orderId,
+            customerEmail,
+            productId,
+            creator.discourseUrl,
+            creator.connectionSecret,
+            "refund",
+            result.error,
+          );
           errors.push(
             `Refund for product ${productId} → ${creator.discourseUrl}: ` +
               `${result.error ?? "Unknown error"}`,
@@ -198,6 +209,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           "refund_failed",
           message,
           "refund",
+        );
+
+        await enqueueRetry(
+          shop,
+          orderId,
+          customerEmail,
+          productId,
+          creator.discourseUrl,
+          creator.connectionSecret,
+          "refund",
+          message,
         );
 
         errors.push(

@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { Sentry } from "../utils/sentry.server";
+import { enqueueRetry } from "../utils/retry-queue.server";
 
 import {
   isDuplicateWebhook,
@@ -128,6 +129,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
 
         if (!result.success) {
+          await enqueueRetry(
+            shop,
+            orderId,
+            customerEmail,
+            productId,
+            creator.discourseUrl,
+            creator.connectionSecret,
+            "purchase",
+            result.error,
+          );
           errors.push(
             `Product ${productId} → ${creator.discourseUrl}: ${
               result.error ?? "Unknown error"
@@ -167,6 +178,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           "failed",
           message,
           "purchase",
+        );
+
+        await enqueueRetry(
+          shop,
+          orderId,
+          customerEmail,
+          productId,
+          creator.discourseUrl,
+          creator.connectionSecret,
+          "purchase",
+          message,
         );
 
         errors.push(
