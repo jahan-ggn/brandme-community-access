@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
-import { processRetryQueue } from "../../utils/retry-queue.server";
-import { logger } from "../../utils/logger.server";
+import { processRetryQueue } from "../utils/retry-queue.server";
+import { logger } from "../utils/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const authHeader = request.headers.get("authorization");
