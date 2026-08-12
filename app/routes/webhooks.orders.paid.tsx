@@ -9,6 +9,7 @@ import {
 } from "../utils/webhook-helpers.server";
 
 import { forwardToDiscourse } from "../utils/discourse-forwarder.server";
+import { logger } from "../utils/logger.server";
 
 type LineItem = {
   product_id: number | string | null;
@@ -24,12 +25,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload, webhookId } =
     await authenticate.webhook(request);
 
-  console.log(
-    `Received ${topic} webhook for ${shop} (webhook ID: ${webhookId})`,
-  );
+  logger.info({ topic, shop, webhookId }, "Webhook received");
 
   if (await isDuplicateWebhook(webhookId)) {
-    console.log(`Ignoring duplicate webhook ${webhookId}`);
+    logger.info({ webhookId }, "Duplicate webhook ignored");
     return new Response();
   }
 
@@ -40,8 +39,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const lineItems = order.line_items ?? [];
 
   if (!customerEmail) {
-    console.error(
-      `No customer email in order ${orderId}, skipping Discourse processing`,
+    logger.warn(
+      { shop, orderId, webhookId },
+      "No customer email, skipping Discourse processing",
     );
 
     await markWebhookProcessed(webhookId, shop, orderId, "orders/paid");
@@ -73,8 +73,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     if (productMappings.length === 0) {
-      console.log(
-        `No creator mapping found for product ${productGid}, skipping`,
+      logger.info(
+        { shop, productGid },
+        "No creator mapping found, skipping product",
       );
       continue;
     }
@@ -96,8 +97,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
 
       if (existingDelivery) {
-        console.log(
-          `Already delivered order ${orderId}, product ${productId} to ${creator.discourseUrl}, skipping`,
+        logger.info(
+          { shop, orderId, productId, discourseUrl: creator.discourseUrl },
+          "Already delivered, skipping",
         );
         continue;
       }
@@ -134,9 +136,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        console.error(
-          `Failed to deliver product ${productId} to ${creator.discourseUrl}:`,
-          error,
+        logger.error(
+          {
+            shop,
+            orderId,
+            productId,
+            discourseUrl: creator.discourseUrl,
+            err: error,
+          },
+          "Delivery failed",
         );
 
         await createDeliveryLog(
@@ -157,10 +165,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (errors.length > 0) {
-    console.error(
-      `Partial failure for orders/paid webhook (order ${orderId}):\n${errors.join(
-        "\n",
-      )}`,
+    logger.error(
+      { shop, orderId, webhookId, errors },
+      "Partial webhook failure",
     );
 
     return new Response("Webhook processing partially failed", {

@@ -9,6 +9,7 @@ import {
 } from "../utils/webhook-helpers.server";
 
 import { forwardToDiscourse } from "../utils/discourse-forwarder.server";
+import { logger } from "../utils/logger.server";
 
 type RefundLineItemEntry = {
   product_id: number | string | null;
@@ -29,12 +30,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload, webhookId } =
     await authenticate.webhook(request);
 
-  console.log(
-    `Received ${topic} webhook for ${shop} (webhook ID: ${webhookId})`,
-  );
+  logger.info({ topic, shop, webhookId }, "Webhook received");
 
   if (await isDuplicateWebhook(webhookId)) {
-    console.log(`Ignoring duplicate webhook ${webhookId}`);
+    logger.info({ webhookId }, "Duplicate webhook ignored");
     return new Response();
   }
 
@@ -45,9 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const refundLineItems = refund.refund_line_items ?? [];
 
   if (refundLineItems.length === 0) {
-    console.log(
-      `No refund line items in refund ${refundId} for order ${orderId}`,
-    );
+    logger.info({ refundId, orderId }, "No refund line items, skipping");
 
     await markWebhookProcessed(webhookId, shop, orderId, "refunds/create");
 
@@ -80,8 +77,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     if (productMappings.length === 0) {
-      console.log(
-        `No creator mapping found for refunded product ${productGid}, skipping`,
+      logger.info(
+        { shop, productGid },
+        "No creator mapping found, skipping product",
       );
       continue;
     }
@@ -103,9 +101,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
 
       if (existingRefund) {
-        console.log(
-          `Refund already delivered for order ${orderId}, product ${productId} ` +
-            `to ${creator.discourseUrl}, skipping`,
+        logger.info(
+          { shop, orderId, productId, discourseUrl: creator.discourseUrl },
+          "Refund already delivered, skipping",
         );
         continue;
       }
@@ -124,9 +122,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
 
       if (!purchaseDelivery) {
-        console.log(
-          `No delivered purchase found for order ${orderId}, ` +
-            `product ${productId} to ${creator.discourseUrl}, skipping refund`,
+        logger.info(
+          { shop, orderId, productId, discourseUrl: creator.discourseUrl },
+          "No delivered purchase found, skipping refund",
         );
         continue;
       }
@@ -164,10 +162,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        console.error(
-          `Failed to deliver refund for product ${productId} ` +
-            `to ${creator.discourseUrl}:`,
-          error,
+        logger.error(
+          {
+            shop,
+            orderId,
+            productId,
+            discourseUrl: creator.discourseUrl,
+            err: error,
+          },
+          "Refund delivery failed",
         );
 
         await createDeliveryLog(
@@ -189,9 +192,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (errors.length > 0) {
-    console.error(
-      `Partial failure for refunds/create webhook ` +
-        `(refund ${refundId}, order ${orderId}):\n${errors.join("\n")}`,
+    logger.error(
+      { shop, refundId, orderId, webhookId, errors },
+      "Partial webhook failure",
     );
 
     return new Response("Webhook processing partially failed", {

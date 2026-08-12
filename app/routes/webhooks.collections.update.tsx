@@ -6,17 +6,16 @@ import {
 } from "../utils/webhook-helpers.server";
 import { syncProductMappings } from "../utils/product-sync.server";
 import db from "../db.server";
+import { logger } from "app/utils/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload, webhookId, admin } =
     await authenticate.webhook(request);
 
-  console.log(
-    `Received ${topic} webhook for ${shop} (webhook ID: ${webhookId})`,
-  );
+  logger.info({ topic, shop, webhookId }, "Webhook received");
 
   if (await isDuplicateWebhook(webhookId)) {
-    console.log(`Ignoring duplicate webhook ${webhookId}`);
+    logger.info({ webhookId }, "Duplicate webhook ignored");
     return new Response();
   }
 
@@ -32,9 +31,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (mappings.length === 0) {
-    console.log(
-      `No CreatorMapping for collection ${collectionGid}, skipping sync`,
-    );
+    logger.info({ shop, collectionGid }, "No CreatorMapping, skipping sync");
+
     await markWebhookProcessed(
       webhookId,
       shop,
@@ -45,9 +43,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (!admin) {
-    console.error(
-      `No admin session for ${shop}; collection sync could not be completed`,
+    logger.error(
+      { shop, collectionGid },
+      "No admin session, collection sync incomplete",
     );
+
     return new Response("Unable to sync collection", { status: 500 });
   }
 
@@ -58,8 +58,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       mapping.id,
       collectionGid,
     );
-    console.log(
-      `Synced collection ${collectionGid}: ${result.synced} added, ${result.removed} removed`,
+    logger.info(
+      {
+        shop,
+        collectionGid,
+        mappingId: mapping.id,
+        synced: result.synced,
+        removed: result.removed,
+      },
+      "Collection synced",
     );
   }
 

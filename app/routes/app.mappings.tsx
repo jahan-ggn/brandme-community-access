@@ -8,6 +8,7 @@ import { authenticate } from "../shopify.server";
 import { syncProductMappings } from "../utils/product-sync.server";
 import { adminGraphQL } from "../utils/api.server";
 import { parseId } from "../utils/validation.server";
+import { logger } from "app/utils/logger.server";
 
 type ShopifyCollection = {
   id: string;
@@ -207,10 +208,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         collection.id,
       );
 
-      console.log(
-        `Created mapping for ${collection.title}: ` +
-          `${syncResult.synced} synced, ` +
-          `${syncResult.removed} removed`,
+      logger.info(
+        {
+          shop,
+          collectionTitle: collection.title,
+          synced: syncResult.synced,
+          removed: syncResult.removed,
+        },
+        "Mapping created and synced",
       );
 
       return {
@@ -226,7 +231,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       });
 
-      console.error(`Failed to create mapping for ${collection.title}`, error);
+      logger.error(
+        { shop, collectionTitle: collection.title, err: error },
+        "Failed to create mapping",
+      );
 
       return {
         error:
@@ -389,10 +397,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         mapping.shopifyCollectionId,
       );
 
-      console.log(
-        `Re-synced ${mapping.collectionName}: ` +
-          `${syncResult.synced} added, ` +
-          `${syncResult.removed} removed`,
+      logger.info(
+        {
+          shop,
+          collectionName: mapping.collectionName,
+          synced: syncResult.synced,
+          removed: syncResult.removed,
+        },
+        "Re-synced",
       );
 
       return {
@@ -402,7 +414,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           `${syncResult.synced} added, ${syncResult.removed} removed.`,
       };
     } catch (error) {
-      console.error(`Failed to re-sync ${mapping.collectionName}`, error);
+      logger.error(
+        { shop, collectionName: mapping.collectionName, err: error },
+        "Re-sync failed",
+      );
 
       return {
         error:
