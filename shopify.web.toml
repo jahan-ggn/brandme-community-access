@@ -1,4 +1,4 @@
-name = "React Router"
+name = "BrandMe Community Access"
 roles = ["frontend", "backend"]
 webhooks_path = "/webhooks/app/uninstalled"
 [commands]
