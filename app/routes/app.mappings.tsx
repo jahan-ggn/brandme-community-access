@@ -6,28 +6,28 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import { syncProductMappings } from "../utils/product-sync.server";
+import { adminGraphQL } from "../utils/api.server";
+import { parseId } from "../utils/validation.server";
 
 type ShopifyCollection = {
   id: string;
   title: string;
 };
 
-type CollectionsQueryResponse = {
-  data?: {
-    collections?: {
-      nodes: ShopifyCollection[];
-      pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-      };
-    };
+type CollectionsConnection = {
+  nodes: ShopifyCollection[];
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
   };
 };
 
-type CollectionQueryResponse = {
-  data?: {
-    collection?: ShopifyCollection | null;
-  };
+type CollectionsData = {
+  collections: CollectionsConnection;
+};
+
+type CollectionData = {
+  collection: ShopifyCollection | null;
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -49,10 +49,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const collections: ShopifyCollection[] = [];
 
   let cursor: string | null = null;
-  let hasNextPage = true;
+  let hasNextPage: boolean = true;
 
   while (hasNextPage) {
-    const response: Response = await admin.graphql(
+    const responseData: CollectionsData = await adminGraphQL<CollectionsData>(
+      admin,
       `#graphql
         query GetCollections($after: String) {
           collections(first: 250, after: $after) {
@@ -68,19 +69,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
       `,
       {
-        variables: {
-          after: cursor,
-        },
+        after: cursor,
       },
     );
 
-    const responseJson: CollectionsQueryResponse = await response.json();
-
-    const collectionsData = responseJson.data?.collections;
-
-    if (!collectionsData) {
-      break;
-    }
+    const collectionsData: CollectionsConnection = responseData.collections;
 
     for (const collection of collectionsData.nodes) {
       collections.push({
@@ -91,6 +84,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     hasNextPage = collectionsData.pageInfo.hasNextPage;
     cursor = collectionsData.pageInfo.endCursor;
+
+    if (hasNextPage && !cursor) {
+      throw new Error("Shopify returned hasNextPage=true but no endCursor");
+    }
   }
 
   const mappedCollectionIds = new Set(
@@ -145,12 +142,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
-    if (
-      parsedDiscourseUrl.protocol !== "https:" &&
-      parsedDiscourseUrl.protocol !== "http:"
-    ) {
+    if (parsedDiscourseUrl.protocol !== "https:") {
       return {
-        error: "Please enter a valid HTTP or HTTPS Discourse URL",
+        error: "Please enter a valid HTTPS Discourse URL",
       };
     }
 
@@ -169,26 +163,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
-    const collectionResponse: Response = await admin.graphql(
+    const responseData: CollectionData = await adminGraphQL<CollectionData>(
+      admin,
       `#graphql
-        query GetCollection($id: ID!) {
-          collection(id: $id) {
-            id
-            title
-          }
+      query GetCollection($id: ID!) {
+        collection(id: $id) {
+          id
+          title
         }
-      `,
+      }
+    `,
       {
-        variables: {
-          id: shopifyCollectionId,
-        },
+        id: shopifyCollectionId,
       },
     );
 
-    const collectionResponseJson: CollectionQueryResponse =
-      await collectionResponse.json();
-
-    const collection = collectionResponseJson.data?.collection;
+    const collection: ShopifyCollection | null = responseData.collection;
 
     if (!collection) {
       return {
@@ -248,13 +238,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === "edit") {
-    const id = Number(formData.get("id"));
+    const id = parseId(formData.get("id"));
+    if (id === null) {
+      return { error: "A valid mapping ID is required" };
+    }
 
     const discourseUrl = String(formData.get("discourseUrl") ?? "").trim();
 
-    if (!id || !discourseUrl) {
+    if (!discourseUrl) {
       return {
-        error: "Mapping ID and Discourse URL are required",
+        error: "Discourse URL is required",
       };
     }
 
@@ -268,12 +261,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
-    if (
-      parsedDiscourseUrl.protocol !== "https:" &&
-      parsedDiscourseUrl.protocol !== "http:"
-    ) {
+    if (parsedDiscourseUrl.protocol !== "https:") {
       return {
-        error: "Please enter a valid HTTP or HTTPS Discourse URL",
+        error: "Please enter a valid HTTPS Discourse URL",
       };
     }
 
@@ -306,12 +296,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === "toggle") {
-    const id = Number(formData.get("id"));
-
-    if (!id) {
-      return {
-        error: "Mapping ID is required",
-      };
+    const id = parseId(formData.get("id"));
+    if (id === null) {
+      return { error: "A valid mapping ID is required" };
     }
 
     const mapping = await db.creatorMapping.findFirst({
@@ -345,12 +332,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === "delete") {
-    const id = Number(formData.get("id"));
-
-    if (!id) {
-      return {
-        error: "Mapping ID is required",
-      };
+    const id = parseId(formData.get("id"));
+    if (id === null) {
+      return { error: "A valid mapping ID is required" };
     }
 
     const mapping = await db.creatorMapping.findFirst({
@@ -379,12 +363,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === "resync") {
-    const id = Number(formData.get("id"));
-
-    if (!id) {
-      return {
-        error: "Mapping ID is required",
-      };
+    const id = parseId(formData.get("id"));
+    if (id === null) {
+      return { error: "A valid mapping ID is required" };
     }
 
     const mapping = await db.creatorMapping.findFirst({
@@ -446,9 +427,10 @@ export default function MappingsPage() {
 
   const previousFetcherState = useRef(fetcher.state);
 
-  const data = fetcher.data;
+  const fetcherData = fetcher.data;
 
-  const error = data && "error" in data ? data.error : undefined;
+  const error =
+    fetcherData && "error" in fetcherData ? fetcherData.error : undefined;
 
   const isSubmitting = fetcher.state !== "idle";
 

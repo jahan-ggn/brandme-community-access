@@ -1,16 +1,28 @@
+export type DiscourseEventType = "purchase" | "refund";
+
+type ForwardToDiscoursePayload = {
+  customerEmail: string;
+  productId: string;
+  orderId: string;
+  eventType: DiscourseEventType;
+};
+
+type ForwardToDiscourseResult = {
+  success: boolean;
+  error?: string;
+};
+
 export async function forwardToDiscourse(
   discourseUrl: string,
   connectionSecret: string,
-  payload: {
-    customerEmail: string;
-    productId: string;
-    orderId: string;
-    eventType: string;
-  },
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const endpoint = `${discourseUrl.replace(/\/+$/, "")}/brandme/webhook`;
+  payload: ForwardToDiscoursePayload,
+): Promise<ForwardToDiscourseResult> {
+  const endpoint = `${discourseUrl.replace(/\/+$/, "")}/brandme/webhook`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+
+  try {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -18,21 +30,40 @@ export async function forwardToDiscourse(
         "X-BrandMe-Secret": connectionSecret,
       },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
       const body = await response.text();
+
       return {
         success: false,
-        error: `Discourse responded ${response.status}: ${body}`,
+        error: `Discourse responded with HTTP ${response.status}: ${body.slice(
+          0,
+          500,
+        )}`,
       };
     }
 
-    return { success: true };
+    return {
+      success: true,
+    };
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        success: false,
+        error: "Discourse request timed out after 4 seconds",
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error:
+        error instanceof Error
+          ? `Discourse request failed: ${error.message}`
+          : "Discourse request failed with an unknown error",
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }

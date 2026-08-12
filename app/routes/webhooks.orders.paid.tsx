@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import db from "../db.server";
 
 import {
   isDuplicateWebhook,
@@ -8,7 +9,6 @@ import {
 } from "../utils/webhook-helpers.server";
 
 import { forwardToDiscourse } from "../utils/discourse-forwarder.server";
-import db from "../db.server";
 
 type LineItem = {
   product_id: number | string | null;
@@ -17,7 +17,7 @@ type LineItem = {
 type OrderPayload = {
   id: number | string;
   email: string | null;
-  line_items: LineItem[] | null;
+  line_items?: LineItem[] | null;
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -30,15 +30,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (await isDuplicateWebhook(webhookId)) {
     console.log(`Ignoring duplicate webhook ${webhookId}`);
-
     return new Response();
   }
 
   const order = payload as OrderPayload;
 
-  const orderId = order?.id?.toString() ?? "";
-  const customerEmail = order?.email?.trim() ?? "";
-  const lineItems = order?.line_items ?? [];
+  const orderId = String(order.id);
+  const customerEmail = order.email?.trim() ?? "";
+  const lineItems = order.line_items ?? [];
 
   if (!customerEmail) {
     console.error(
@@ -50,42 +49,60 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response();
   }
 
-  try {
-    for (const item of lineItems) {
-      if (!item.product_id) {
-        continue;
-      }
+  const errors: string[] = [];
 
-      const productId = item.product_id.toString();
+  for (const item of lineItems) {
+    if (item.product_id == null) {
+      continue;
+    }
 
-      const productGid = `gid://shopify/Product/${productId}`;
+    const productId = String(item.product_id);
+    const productGid = `gid://shopify/Product/${productId}`;
 
-      const productMappings = await db.productMapping.findMany({
+    const productMappings = await db.productMapping.findMany({
+      where: {
+        shop,
+        shopifyProductId: productGid,
+        creatorMapping: {
+          enabled: true,
+        },
+      },
+      include: {
+        creatorMapping: true,
+      },
+    });
+
+    if (productMappings.length === 0) {
+      console.log(
+        `No creator mapping found for product ${productGid}, skipping`,
+      );
+      continue;
+    }
+
+    for (const productMapping of productMappings) {
+      const creator = productMapping.creatorMapping;
+
+      const existingDelivery = await db.deliveryLog.findFirst({
         where: {
           shop,
-          shopifyProductId: productGid,
-
-          creatorMapping: {
-            enabled: true,
-          },
+          orderId,
+          productId,
+          discourseCommunity: creator.discourseUrl,
+          status: "delivered",
         },
-
-        include: {
-          creatorMapping: true,
+        select: {
+          id: true,
         },
       });
 
-      if (productMappings.length === 0) {
+      if (existingDelivery) {
         console.log(
-          `No creator mapping found for product ${productGid}, skipping`,
+          `Already delivered order ${orderId}, product ${productId} to ${creator.discourseUrl}, skipping`,
         );
-
         continue;
       }
 
-      for (const productMapping of productMappings) {
-        const creator = productMapping.creatorMapping;
-
+      try {
         const result = await forwardToDiscourse(
           creator.discourseUrl,
           creator.connectionSecret,
@@ -93,7 +110,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             customerEmail,
             productId,
             orderId,
-            eventType: "orders/paid",
+            eventType: "purchase",
           },
         );
 
@@ -108,21 +125,45 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
 
         if (!result.success) {
-          throw new Error(
-            `Failed to deliver product ${productId} to ${creator.discourseUrl}: ${
+          errors.push(
+            `Product ${productId} → ${creator.discourseUrl}: ${
               result.error ?? "Unknown error"
             }`,
           );
         }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        console.error(
+          `Failed to deliver product ${productId} to ${creator.discourseUrl}:`,
+          error,
+        );
+
+        await createDeliveryLog(
+          shop,
+          orderId,
+          customerEmail,
+          productId,
+          creator.discourseUrl,
+          "failed",
+          message,
+        );
+
+        errors.push(
+          `Product ${productId} → ${creator.discourseUrl}: ${message}`,
+        );
       }
     }
-  } catch (error) {
+  }
+
+  if (errors.length > 0) {
     console.error(
-      `Failed to process orders/paid webhook for order ${orderId}`,
-      error,
+      `Partial failure for orders/paid webhook (order ${orderId}):\n${errors.join(
+        "\n",
+      )}`,
     );
 
-    return new Response("Webhook processing failed", {
+    return new Response("Webhook processing partially failed", {
       status: 500,
     });
   }

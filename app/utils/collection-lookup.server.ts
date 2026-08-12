@@ -1,19 +1,18 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
+import { adminGraphQL } from "./api.server";
 
-type CollectionProductsResponse = {
-  data?: {
-    collection?: {
-      products?: {
-        nodes: Array<{
-          id: string;
-        }>;
-        pageInfo: {
-          hasNextPage: boolean;
-          endCursor: string | null;
-        };
-      };
-    } | null;
+type CollectionProducts = {
+  nodes: Array<{ id: string }>;
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
   };
+};
+
+type CollectionProductsData = {
+  collection: {
+    products: CollectionProducts;
+  } | null;
 };
 
 export async function getCollectionProducts(
@@ -21,36 +20,36 @@ export async function getCollectionProducts(
   collectionGid: string,
 ): Promise<string[]> {
   const productIds: string[] = [];
+
   let cursor: string | null = null;
-  let hasNextPage = true;
+  let hasNextPage: boolean = true;
 
   while (hasNextPage) {
-    const response: Response = await admin.graphql(
-      `#graphql
-      query GetCollectionProducts($id: ID!, $after: String) {
-        collection(id: $id) {
-          products(first: 250, after: $after) {
-            nodes {
-              id
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
+    const data: CollectionProductsData =
+      await adminGraphQL<CollectionProductsData>(
+        admin,
+        `#graphql
+          query GetCollectionProducts($id: ID!, $after: String) {
+            collection(id: $id) {
+              products(first: 250, after: $after) {
+                nodes {
+                  id
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+              }
             }
           }
-        }
-      }`,
-      {
-        variables: {
+        `,
+        {
           id: collectionGid,
           after: cursor,
         },
-      },
-    );
+      );
 
-    const responseJson: CollectionProductsResponse = await response.json();
-
-    const products = responseJson.data?.collection?.products;
+    const products: CollectionProducts | undefined = data.collection?.products;
 
     if (!products) {
       break;
@@ -61,9 +60,10 @@ export async function getCollectionProducts(
     }
 
     hasNextPage = products.pageInfo.hasNextPage;
+    cursor = products.pageInfo.endCursor;
 
-    if (hasNextPage) {
-      cursor = products.pageInfo.endCursor;
+    if (hasNextPage && !cursor) {
+      throw new Error("Shopify returned hasNextPage=true but no endCursor");
     }
   }
 
