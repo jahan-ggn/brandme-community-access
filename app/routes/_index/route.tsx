@@ -52,7 +52,7 @@ export default function App() {
       <div className={styles.container}>
         <header className={styles.header}>
           <img
-            src="/brandme-logo.jpg"
+            src="/brandme-logo.png"
             alt="BrandMe Studio"
             className={styles.logo}
           />
@@ -78,7 +78,9 @@ export default function App() {
         {showForm && (
           <section className={styles.connectCard}>
             <div className={styles.cardHeader}>
-              <div className={styles.storeIcon}>S</div>
+              <div className={styles.storeIcon}>
+                <img src="/brandme-favicon.svg" alt="BrandMe" />
+              </div>
 
               <div>
                 <h2>Connect your Shopify store</h2>
