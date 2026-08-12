@@ -7,7 +7,11 @@ import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import { syncProductMappings } from "../utils/product-sync.server";
 import { adminGraphQL } from "../utils/api.server";
-import { parseId } from "../utils/validation.server";
+import {
+  parseId,
+  validateCollectionName,
+  validateDiscourseUrl,
+} from "../utils/validation.server";
 import { logger } from "../utils/logger.server";
 
 type ShopifyCollection = {
@@ -125,29 +129,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       formData.get("shopifyCollectionId") ?? "",
     ).trim();
 
-    const discourseUrl = String(formData.get("discourseUrl") ?? "").trim();
-
-    if (!shopifyCollectionId || !discourseUrl) {
+    if (!shopifyCollectionId) {
       return {
-        error: "Collection and Discourse URL are required",
+        error: "Collection is required",
       };
     }
 
-    let parsedDiscourseUrl: URL;
+    const discourseUrlRaw = String(formData.get("discourseUrl") ?? "");
 
-    try {
-      parsedDiscourseUrl = new URL(discourseUrl);
-    } catch {
-      return {
-        error: "Please enter a valid Discourse URL",
-      };
+    const urlResult = validateDiscourseUrl(discourseUrlRaw);
+
+    if (!urlResult.ok) {
+      return { error: urlResult.error };
     }
 
-    if (parsedDiscourseUrl.protocol !== "https:") {
-      return {
-        error: "Please enter a valid HTTPS Discourse URL",
-      };
-    }
+    const discourseUrl = urlResult.url;
 
     const existing = await db.creatorMapping.findUnique({
       where: {
@@ -187,14 +183,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
+    const nameResult = validateCollectionName(collection.title);
+
+    if (!nameResult.ok) {
+      return { error: nameResult.error };
+    }
+
     const connectionSecret = crypto.randomUUID();
 
     const mapping = await db.creatorMapping.create({
       data: {
         shop,
         shopifyCollectionId: collection.id,
-        collectionName: collection.title,
-        discourseUrl: parsedDiscourseUrl.toString().replace(/\/+$/, ""),
+        collectionName: nameResult.name,
+        discourseUrl,
         connectionSecret,
         enabled: true,
       },
@@ -211,7 +213,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       logger.info(
         {
           shop,
-          collectionTitle: collection.title,
+          collectionTitle: nameResult.name,
           synced: syncResult.synced,
           removed: syncResult.removed,
         },
@@ -232,7 +234,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
 
       logger.error(
-        { shop, collectionTitle: collection.title, err: error },
+        { shop, collectionTitle: nameResult.name, err: error },
         "Failed to create mapping",
       );
 
@@ -251,28 +253,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { error: "A valid mapping ID is required" };
     }
 
-    const discourseUrl = String(formData.get("discourseUrl") ?? "").trim();
+    const discourseUrlRaw = String(formData.get("discourseUrl") ?? "");
 
-    if (!discourseUrl) {
-      return {
-        error: "Discourse URL is required",
-      };
-    }
+    const urlResult = validateDiscourseUrl(discourseUrlRaw);
 
-    let parsedDiscourseUrl: URL;
-
-    try {
-      parsedDiscourseUrl = new URL(discourseUrl);
-    } catch {
-      return {
-        error: "Please enter a valid Discourse URL",
-      };
-    }
-
-    if (parsedDiscourseUrl.protocol !== "https:") {
-      return {
-        error: "Please enter a valid HTTPS Discourse URL",
-      };
+    if (!urlResult.ok) {
+      return { error: urlResult.error };
     }
 
     const mapping = await db.creatorMapping.findFirst({
@@ -289,11 +275,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     await db.creatorMapping.update({
-      where: {
-        id: mapping.id,
-      },
+      where: { id: mapping.id },
       data: {
-        discourseUrl: parsedDiscourseUrl.toString().replace(/\/+$/, ""),
+        discourseUrl: urlResult.url,
       },
     });
 
