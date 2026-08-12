@@ -6,7 +6,7 @@ import {
 } from "../utils/webhook-helpers.server";
 import { syncProductMappings } from "../utils/product-sync.server";
 import db from "../db.server";
-import { logger } from "app/utils/logger.server";
+import { logger } from "../utils/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload, webhookId, admin } =

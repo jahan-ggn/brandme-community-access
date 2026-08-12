@@ -8,7 +8,7 @@ import { authenticate } from "../shopify.server";
 import { syncProductMappings } from "../utils/product-sync.server";
 import { adminGraphQL } from "../utils/api.server";
 import { parseId } from "../utils/validation.server";
-import { logger } from "app/utils/logger.server";
+import { logger } from "../utils/logger.server";
 
 type ShopifyCollection = {
   id: string;
