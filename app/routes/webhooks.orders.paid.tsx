@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { Sentry } from "../utils/sentry.server";
 
 import {
   isDuplicateWebhook,
@@ -147,6 +148,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           "Delivery failed",
         );
 
+        Sentry.captureException(error, {
+          tags: { topic, shop },
+          extra: {
+            webhookId,
+            orderId,
+            productId,
+            discourseUrl: creator.discourseUrl,
+          },
+        });
+
         await createDeliveryLog(
           shop,
           orderId,
@@ -165,6 +176,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (errors.length > 0) {
+    Sentry.captureException(new Error("Partial webhook failure"), {
+      tags: { topic, shop },
+      extra: { webhookId, orderId, errors },
+    });
     logger.error(
       { shop, orderId, webhookId, errors },
       "Partial webhook failure",
