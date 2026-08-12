@@ -34,14 +34,30 @@ export async function createDeliveryLog(
   discourseCommunity: string,
   status: string = "pending",
   errorMessage?: string,
+  eventType: string = "purchase",
 ): Promise<void> {
-  await db.deliveryLog.create({
-    data: {
+  await db.deliveryLog.upsert({
+    where: {
+      orderId_productId_discourseCommunity_eventType: {
+        orderId,
+        productId,
+        discourseCommunity,
+        eventType,
+      },
+    },
+    update: {
+      status,
+      errorMessage: errorMessage ?? null,
+      customerEmail,
+      updatedAt: new Date(),
+    },
+    create: {
       shop,
       orderId,
       customerEmail,
       productId,
       discourseCommunity,
+      eventType,
       status,
       errorMessage: errorMessage ?? null,
     },

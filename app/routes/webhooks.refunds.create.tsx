@@ -88,20 +88,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     for (const productMapping of productMappings) {
       const creator = productMapping.creatorMapping;
 
-      const existingRefund = await db.deliveryLog.findFirst({
+      const existingRefund = await db.deliveryLog.findUnique({
         where: {
-          shop,
-          orderId,
-          productId,
-          discourseCommunity: creator.discourseUrl,
-          status: "refund_delivered",
+          orderId_productId_discourseCommunity_eventType: {
+            orderId,
+            productId,
+            discourseCommunity: creator.discourseUrl,
+            eventType: "refund",
+          },
         },
         select: {
           id: true,
+          status: true,
         },
       });
 
-      if (existingRefund) {
+      if (existingRefund?.status === "refund_delivered") {
         logger.info(
           { shop, orderId, productId, discourseUrl: creator.discourseUrl },
           "Refund already delivered, skipping",
@@ -109,20 +111,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         continue;
       }
 
-      const purchaseDelivery = await db.deliveryLog.findFirst({
+      const purchaseDelivery = await db.deliveryLog.findUnique({
         where: {
-          shop,
-          orderId,
-          productId,
-          discourseCommunity: creator.discourseUrl,
-          status: "delivered",
+          orderId_productId_discourseCommunity_eventType: {
+            orderId,
+            productId,
+            discourseCommunity: creator.discourseUrl,
+            eventType: "purchase",
+          },
         },
         select: {
           customerEmail: true,
+          status: true,
         },
       });
 
-      if (!purchaseDelivery) {
+      if (!purchaseDelivery || purchaseDelivery.status !== "delivered") {
         logger.info(
           { shop, orderId, productId, discourseUrl: creator.discourseUrl },
           "No delivered purchase found, skipping refund",
@@ -152,6 +156,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           result.success ? "refund_delivered" : "refund_failed",
           result.error,
+          "refund",
         );
 
         if (!result.success) {
@@ -192,6 +197,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           "refund_failed",
           message,
+          "refund",
         );
 
         errors.push(

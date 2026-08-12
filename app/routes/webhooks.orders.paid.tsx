@@ -84,20 +84,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     for (const productMapping of productMappings) {
       const creator = productMapping.creatorMapping;
 
-      const existingDelivery = await db.deliveryLog.findFirst({
+      const existingDelivery = await db.deliveryLog.findUnique({
         where: {
-          shop,
-          orderId,
-          productId,
-          discourseCommunity: creator.discourseUrl,
-          status: "delivered",
+          orderId_productId_discourseCommunity_eventType: {
+            orderId,
+            productId,
+            discourseCommunity: creator.discourseUrl,
+            eventType: "purchase",
+          },
         },
-        select: {
-          id: true,
-        },
+        select: { id: true, status: true },
       });
 
-      if (existingDelivery) {
+      if (existingDelivery?.status === "delivered") {
         logger.info(
           { shop, orderId, productId, discourseUrl: creator.discourseUrl },
           "Already delivered, skipping",
@@ -125,6 +124,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           result.success ? "delivered" : "failed",
           result.error,
+          "purchase",
         );
 
         if (!result.success) {
@@ -166,6 +166,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           "failed",
           message,
+          "purchase",
         );
 
         errors.push(
