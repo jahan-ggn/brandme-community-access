@@ -110,10 +110,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           creator.connectionSecret,
           {
-            customerEmail,
+            event: "purchase",
+            email: customerEmail,
+            webhookId,
             productId,
             orderId,
-            eventType: "purchase",
           },
         );
 
@@ -137,6 +138,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             creator.discourseUrl,
             creator.connectionSecret,
             "purchase",
+            webhookId,
             result.error,
           );
           errors.push(
@@ -188,6 +190,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           creator.connectionSecret,
           "purchase",
+          webhookId,
           message,
         );
 

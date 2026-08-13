@@ -22,6 +22,7 @@ export async function enqueueRetry(
   discourseUrl: string,
   connectionSecret: string,
   eventType: string,
+  webhookId: string,
   lastError?: string,
 ): Promise<void> {
   await db.retryQueue.create({
@@ -33,6 +34,7 @@ export async function enqueueRetry(
       discourseUrl,
       connectionSecret,
       eventType,
+      webhookId,
       lastError,
     },
   });
@@ -65,10 +67,11 @@ export async function processRetryQueue(): Promise<void> {
         item.discourseUrl,
         item.connectionSecret,
         {
-          customerEmail: item.customerEmail,
+          event: item.eventType as "purchase" | "refund",
+          email: item.customerEmail,
+          webhookId: item.webhookId,
           productId: item.productId,
           orderId: item.orderId,
-          eventType: item.eventType as "purchase" | "refund",
         },
       );
 

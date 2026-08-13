@@ -93,6 +93,7 @@ model DeliveryLog {
 model RetryQueue {
   id               Int       @id @default(autoincrement())
   shop             String
+  webhookId        String
   orderId          String
   customerEmail    String
   productId        String
@@ -108,4 +109,5 @@ model RetryQueue {
 
   @@index([nextRetryAt])
   @@index([shop])
+  @@index([webhookId])
 }

@@ -1,12 +1,14 @@
 import { getLimiter } from "./rate-limiter.server";
+import { createHmac } from "crypto";
 
 export type DiscourseEventType = "purchase" | "refund";
 
 type ForwardToDiscoursePayload = {
-  customerEmail: string;
-  productId: string;
+  event: DiscourseEventType;
+  webhookId: string;
   orderId: string;
-  eventType: DiscourseEventType;
+  productId: string;
+  email: string;
 };
 
 type ForwardToDiscourseResult = {
@@ -19,29 +21,36 @@ export async function forwardToDiscourse(
   connectionSecret: string,
   payload: ForwardToDiscoursePayload,
 ): Promise<ForwardToDiscourseResult> {
-  const endpoint = `${discourseUrl.replace(/\/+$/, "")}/brandme/webhook`;
+  const endpoint = `${discourseUrl.replace(/\/+$/, "")}/brandme/access`;
   const limiter = getLimiter(discourseUrl);
 
   return limiter.run(async () => {
+    const body = JSON.stringify(payload);
+    const timestamp = Date.now().toString();
+    const signature = createHmac("sha256", connectionSecret)
+      .update(`${timestamp}.${body}`)
+      .digest("hex");
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-BrandMe-Secret": connectionSecret,
+          "X-BrandMe-Timestamp": timestamp,
+          "X-BrandMe-Signature": signature,
         },
-        body: JSON.stringify(payload),
+        body,
         signal: controller.signal,
       });
 
       if (!response.ok) {
-        const body = await response.text();
+        const responseBody = await response.text();
         return {
           success: false,
-          error: `Discourse responded with HTTP ${response.status}: ${body.slice(0, 500)}`,
+          error: `Discourse responded with HTTP ${response.status}: ${responseBody.slice(0, 500)}`,
         };
       }
 
@@ -50,7 +59,7 @@ export async function forwardToDiscourse(
       if (error instanceof Error && error.name === "AbortError") {
         return {
           success: false,
-          error: "Discourse request timed out after 4 seconds",
+          error: "Discourse request timed out after 5 seconds",
         };
       }
 

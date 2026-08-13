@@ -142,10 +142,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           creator.connectionSecret,
           {
-            customerEmail,
+            event: "refund",
+            email: customerEmail,
+            webhookId,
             productId,
             orderId,
-            eventType: "refund",
           },
         );
 
@@ -169,6 +170,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             creator.discourseUrl,
             creator.connectionSecret,
             "refund",
+            webhookId,
             result.error,
           );
           errors.push(
@@ -219,6 +221,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           creator.connectionSecret,
           "refund",
+          webhookId,
           message,
         );
 
