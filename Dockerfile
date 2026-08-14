@@ -1,24 +1,24 @@
 FROM node:20-alpine
-RUN apk add --no-cache openssl
 
-EXPOSE 3000
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV DATABASE_URL="file:/app/data/brandme.sqlite"
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev \
+  && npm cache clean --force
 
 COPY . .
 
+RUN npx prisma generate
 RUN npm run build
 
-VOLUME /app/data
+EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+VOLUME ["/app/data"]
 
-CMD ["npm", "run", "docker-start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && exec npm run docker-start"]

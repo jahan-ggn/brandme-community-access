@@ -1,0 +1,67 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+
+    volumes:
+      - app-data:/app/data
+
+    expose:
+      - "3000"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+    depends_on:
+      app:
+        condition: service_healthy
+
+  retry-worker:
+    image: curlimages/curl:8.16.0
+    restart: unless-stopped
+
+    depends_on:
+      app:
+        condition: service_healthy
+
+    environment:
+      RETRY_WORKER_SECRET: ${RETRY_WORKER_SECRET}
+      APP_URL: http://app:3000
+
+    entrypoint: /bin/sh
+
+    command:
+      - -c
+      - |
+        while true; do
+          sleep 120
+
+          curl --fail --silent --show-error \
+            -X POST "$$APP_URL/api.retry" \
+            -H "Authorization: Bearer $$RETRY_WORKER_SECRET" \
+            || true
+        done
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:
