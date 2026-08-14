@@ -14,6 +14,9 @@ import {
 } from "../utils/validation.server";
 import { logger } from "../utils/logger.server";
 
+import { MappingForm } from "../components/mappings/MappingForm";
+import { MappingsTable } from "../components/mappings/MappingsTable";
+
 type ShopifyCollection = {
   id: string;
   title: string;
@@ -44,17 +47,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     orderBy: { createdAt: "desc" },
     include: {
       products: {
-        select: {
-          id: true,
-        },
+        select: { id: true },
       },
     },
   });
 
   const collections: ShopifyCollection[] = [];
-
   let cursor: string | null = null;
-  let hasNextPage: boolean = true;
+  let hasNextPage = true;
 
   while (hasNextPage) {
     const responseData: CollectionsData = await adminGraphQL<CollectionsData>(
@@ -73,12 +73,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           }
         }
       `,
-      {
-        after: cursor,
-      },
+      { after: cursor },
     );
 
-    const collectionsData: CollectionsConnection = responseData.collections;
+    const collectionsData = responseData.collections;
 
     for (const collection of collectionsData.nodes) {
       collections.push({
@@ -108,8 +106,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       enabled: mapping.enabled,
       productCount: mapping.products.length,
       createdAt: mapping.createdAt,
+      connectionSecret: mapping.connectionSecret,
     })),
-
     collections: collections.map((collection) => ({
       ...collection,
       alreadyMapped: mappedCollectionIds.has(collection.id),
@@ -130,13 +128,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ).trim();
 
     if (!shopifyCollectionId) {
-      return {
-        error: "Collection is required",
-      };
+      return { error: "Collection is required" };
     }
 
     const discourseUrlRaw = String(formData.get("discourseUrl") ?? "");
-
     const urlResult = validateDiscourseUrl(discourseUrlRaw);
 
     if (!urlResult.ok) {
@@ -155,9 +150,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     if (existing) {
-      return {
-        error: "A mapping for this collection already exists",
-      };
+      return { error: "A mapping for this collection already exists" };
     }
 
     const responseData: CollectionData = await adminGraphQL<CollectionData>(
@@ -170,17 +163,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       }
     `,
-      {
-        id: shopifyCollectionId,
-      },
+      { id: shopifyCollectionId },
     );
 
-    const collection: ShopifyCollection | null = responseData.collection;
+    const collection = responseData.collection;
 
     if (!collection) {
-      return {
-        error: "The selected Shopify collection could not be found",
-      };
+      return { error: "The selected Shopify collection could not be found" };
     }
 
     const nameResult = validateCollectionName(collection.title);
@@ -225,12 +214,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         message: `Mapping created. ${syncResult.synced} product${
           syncResult.synced === 1 ? "" : "s"
         } synced.`,
+        connectionSecret: mapping.connectionSecret,
       };
     } catch (error) {
       await db.creatorMapping.delete({
-        where: {
-          id: mapping.id,
-        },
+        where: { id: mapping.id },
       });
 
       logger.error(
@@ -254,7 +242,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const discourseUrlRaw = String(formData.get("discourseUrl") ?? "");
-
     const urlResult = validateDiscourseUrl(discourseUrlRaw);
 
     if (!urlResult.ok) {
@@ -262,29 +249,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const mapping = await db.creatorMapping.findFirst({
-      where: {
-        id,
-        shop,
-      },
+      where: { id, shop },
     });
 
     if (!mapping) {
-      return {
-        error: "Mapping not found",
-      };
+      return { error: "Mapping not found" };
     }
 
     await db.creatorMapping.update({
       where: { id: mapping.id },
-      data: {
-        discourseUrl: urlResult.url,
-      },
+      data: { discourseUrl: urlResult.url },
     });
 
-    return {
-      success: true,
-      message: "Mapping updated.",
-    };
+    return { success: true, message: "Mapping updated." };
   }
 
   if (intent === "toggle") {
@@ -294,27 +271,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const mapping = await db.creatorMapping.findFirst({
-      where: {
-        id,
-        shop,
-      },
+      where: { id, shop },
     });
 
     if (!mapping) {
-      return {
-        error: "Mapping not found",
-      };
+      return { error: "Mapping not found" };
     }
 
     const enabled = !mapping.enabled;
 
     await db.creatorMapping.update({
-      where: {
-        id: mapping.id,
-      },
-      data: {
-        enabled,
-      },
+      where: { id: mapping.id },
+      data: { enabled },
     });
 
     return {
@@ -330,28 +298,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const mapping = await db.creatorMapping.findFirst({
-      where: {
-        id,
-        shop,
-      },
+      where: { id, shop },
     });
 
     if (!mapping) {
-      return {
-        error: "Mapping not found",
-      };
+      return { error: "Mapping not found" };
     }
 
     await db.creatorMapping.delete({
-      where: {
-        id: mapping.id,
-      },
+      where: { id: mapping.id },
     });
 
-    return {
-      success: true,
-      message: "Mapping deleted.",
-    };
+    return { success: true, message: "Mapping deleted." };
   }
 
   if (intent === "resync") {
@@ -361,16 +319,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const mapping = await db.creatorMapping.findFirst({
-      where: {
-        id,
-        shop,
-      },
+      where: { id, shop },
     });
 
     if (!mapping) {
-      return {
-        error: "Mapping not found",
-      };
+      return { error: "Mapping not found" };
     }
 
     try {
@@ -393,9 +346,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       return {
         success: true,
-        message:
-          `Re-synced successfully. ` +
-          `${syncResult.synced} added, ${syncResult.removed} removed.`,
+        message: `Re-synced successfully. ${syncResult.synced} added, ${syncResult.removed} removed.`,
       };
     } catch (error) {
       logger.error(
@@ -412,9 +363,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  return {
-    error: "Unknown action",
-  };
+  return { error: "Unknown action" };
 };
 
 export default function MappingsPage() {
@@ -425,12 +374,6 @@ export default function MappingsPage() {
   const shopify = useAppBridge();
 
   const previousFetcherState = useRef(fetcher.state);
-
-  const fetcherData = fetcher.data;
-
-  const error =
-    fetcherData && "error" in fetcherData ? fetcherData.error : undefined;
-
   const isSubmitting = fetcher.state !== "idle";
 
   useEffect(() => {
@@ -445,7 +388,6 @@ export default function MappingsPage() {
             : "Operation completed successfully.";
 
         shopify.toast.show(message);
-
         revalidator.revalidate();
       }
     }
@@ -456,135 +398,11 @@ export default function MappingsPage() {
   return (
     <s-page heading="Creator Community Mappings">
       <s-section heading="Add a new mapping">
-        {error && (
-          <s-banner tone="critical">
-            <s-paragraph>{error}</s-paragraph>
-          </s-banner>
-        )}
-
-        <fetcher.Form method="post">
-          <input type="hidden" name="intent" value="create" />
-
-          <s-stack direction="block" gap="base">
-            <s-select
-              name="shopifyCollectionId"
-              label="Shopify Collection"
-              placeholder="Select a collection…"
-              required
-            >
-              {collections.map((collection) => (
-                <s-option
-                  key={collection.id}
-                  value={collection.id}
-                  disabled={collection.alreadyMapped}
-                >
-                  {collection.title}
-                  {collection.alreadyMapped ? " (already mapped)" : ""}
-                </s-option>
-              ))}
-            </s-select>
-
-            <s-text-field
-              name="discourseUrl"
-              label="Discourse Community URL"
-              placeholder="https://community.example.com"
-              required
-            />
-
-            <s-button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating…" : "Create mapping"}
-            </s-button>
-          </s-stack>
-        </fetcher.Form>
+        <MappingForm collections={collections} isSubmitting={isSubmitting} />
       </s-section>
 
       <s-section heading="Existing mappings">
-        {mappings.length === 0 ? (
-          <s-paragraph>No mappings yet. Create one above.</s-paragraph>
-        ) : (
-          <s-table>
-            <s-table-header-row>
-              <s-table-header>Creator</s-table-header>
-
-              <s-table-header>Discourse URL</s-table-header>
-
-              <s-table-header>Products</s-table-header>
-
-              <s-table-header>Status</s-table-header>
-
-              <s-table-header>Created</s-table-header>
-
-              <s-table-header>Actions</s-table-header>
-            </s-table-header-row>
-
-            <s-table-body>
-              {mappings.map((mapping) => (
-                <s-table-row key={mapping.id}>
-                  <s-table-cell>{mapping.collectionName}</s-table-cell>
-
-                  <s-table-cell>{mapping.discourseUrl}</s-table-cell>
-
-                  <s-table-cell>{mapping.productCount}</s-table-cell>
-
-                  <s-table-cell>
-                    {mapping.enabled ? "Enabled" : "Disabled"}
-                  </s-table-cell>
-
-                  <s-table-cell>
-                    {new Date(mapping.createdAt).toLocaleDateString()}
-                  </s-table-cell>
-
-                  <s-table-cell>
-                    <s-stack direction="inline" gap="base">
-                      <fetcher.Form method="post" style={{ display: "inline" }}>
-                        <input type="hidden" name="intent" value="toggle" />
-
-                        <input type="hidden" name="id" value={mapping.id} />
-
-                        <s-button
-                          type="submit"
-                          variant="tertiary"
-                          disabled={isSubmitting}
-                        >
-                          {mapping.enabled ? "Disable" : "Enable"}
-                        </s-button>
-                      </fetcher.Form>
-
-                      <fetcher.Form method="post" style={{ display: "inline" }}>
-                        <input type="hidden" name="intent" value="resync" />
-
-                        <input type="hidden" name="id" value={mapping.id} />
-
-                        <s-button
-                          type="submit"
-                          variant="tertiary"
-                          disabled={isSubmitting}
-                        >
-                          Re-sync
-                        </s-button>
-                      </fetcher.Form>
-
-                      <fetcher.Form method="post" style={{ display: "inline" }}>
-                        <input type="hidden" name="intent" value="delete" />
-
-                        <input type="hidden" name="id" value={mapping.id} />
-
-                        <s-button
-                          type="submit"
-                          variant="tertiary"
-                          tone="critical"
-                          disabled={isSubmitting}
-                        >
-                          Delete
-                        </s-button>
-                      </fetcher.Form>
-                    </s-stack>
-                  </s-table-cell>
-                </s-table-row>
-              ))}
-            </s-table-body>
-          </s-table>
-        )}
+        <MappingsTable mappings={mappings} isSubmitting={isSubmitting} />
       </s-section>
     </s-page>
   );
