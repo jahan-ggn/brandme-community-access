@@ -7,9 +7,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV DATABASE_URL="file:/app/data/brandme.sqlite"
 
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-RUN npm ci --omit=dev \
+RUN npm install --omit=dev \
   && npm cache clean --force
 
 COPY . .
