@@ -40,8 +40,7 @@ api_version = "2025-10"
   topics = ["products/update"]
 
 [auth]
-redirect_urls = ["https://example.com/api/auth"]
+redirect_urls = ["https://app.quixote.university/api/auth"]
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
