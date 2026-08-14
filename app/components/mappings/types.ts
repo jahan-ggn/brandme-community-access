@@ -9,7 +9,7 @@ export type MappingData = {
   connectionSecret: string;
 };
 
-export type CollectionData = {
+export type CollectionOption = {
   id: string;
   title: string;
   alreadyMapped: boolean;

@@ -1,11 +1,11 @@
 import { useFetcher } from "react-router";
-import type { CollectionData, MappingAction } from "./types";
+import type { CollectionOption, MappingAction } from "./types";
 
 export function MappingForm({
   collections,
   isSubmitting,
 }: {
-  collections: CollectionData[];
+  collections: CollectionOption[];
   isSubmitting: boolean;
 }) {
   const fetcher = useFetcher<MappingAction>();
