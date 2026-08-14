@@ -3,11 +3,12 @@ import { forwardToDiscourse } from "./discourse-forwarder.server";
 import { createDeliveryLog } from "./webhook-helpers.server";
 import { logger } from "./logger.server";
 import { Sentry } from "./sentry.server";
+import { MAX_RETRY_ATTEMPTS } from "./retry-config.server";
 
 const BASE_DELAY_MS = 30_000;
 const MAX_DELAY_MS = 3_600_000;
 const BATCH_SIZE = 10;
-const MAX_ATTEMPTS = 5;
+const MAX_ATTEMPTS = MAX_RETRY_ATTEMPTS;
 
 function calculateBackoff(attemptCount: number): number {
   const delay = BASE_DELAY_MS * Math.pow(2, attemptCount);
