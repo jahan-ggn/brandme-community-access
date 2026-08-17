@@ -1,4 +1,7 @@
 import db from "../db.server";
+import { logger } from "./logger.server";
+
+const WEBHOOK_RETENTION_DAYS = 7;
 
 export async function isDuplicateWebhook(webhookId: string): Promise<boolean> {
   const existing = await db.processedWebhook.findUnique({
@@ -62,4 +65,18 @@ export async function createDeliveryLog(
       errorMessage: errorMessage ?? null,
     },
   });
+}
+
+export async function cleanupOldWebhooks(): Promise<void> {
+  const cutoff = new Date(
+    Date.now() - WEBHOOK_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  const result = await db.processedWebhook.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+
+  if (result.count > 0) {
+    logger.info({ deleted: result.count }, "Cleaned up old processed webhooks");
+  }
 }

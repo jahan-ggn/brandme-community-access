@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { processRetryQueue } from "../utils/retry-queue.server";
+import { cleanupOldWebhooks } from "../utils/webhook-helpers.server";
 import { logger } from "../utils/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -12,6 +13,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     await processRetryQueue();
+    await cleanupOldWebhooks();
     return new Response("OK", { status: 200 });
   } catch (error) {
     logger.error({ err: error }, "Retry worker endpoint failed");
