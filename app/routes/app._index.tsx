@@ -1,8 +1,9 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
 
+import { useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
+import { Sentry } from "../utils/sentry";
 import db from "../db.server";
 
 import { StatsCards } from "../components/dashboard/StatsCards";
@@ -217,3 +218,9 @@ export default function Index() {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  Sentry.captureException(error);
+  return boundary.error(error);
+}

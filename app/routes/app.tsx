@@ -17,13 +17,6 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">
-          <img
-            src="/brandme-favicon.svg"
-            alt="BrandMe"
-            style={{ height: "24px", width: "auto", verticalAlign: "middle" }}
-          />
-        </s-link>
         <s-link href="/app">Home</s-link>
         <s-link href="/app/mappings">Mappings</s-link>
       </s-app-nav>

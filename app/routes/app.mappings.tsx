@@ -1,7 +1,17 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import type {
+  ActionFunctionArgs,
+  HeadersFunction,
+  LoaderFunctionArgs,
+} from "react-router";
+import {
+  useFetcher,
+  useLoaderData,
+  useRevalidator,
+  useRouteError,
+} from "react-router";
 import { useEffect, useRef } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
+import { boundary } from "@shopify/shopify-app-react-router/server";
 
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
@@ -13,6 +23,7 @@ import {
   validateDiscourseUrl,
 } from "../utils/validation.server";
 import { logger } from "../utils/logger.server";
+import { Sentry } from "../utils/sentry";
 
 import { MappingForm } from "../components/mappings/MappingForm";
 import { MappingsTable } from "../components/mappings/MappingsTable";
@@ -46,9 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     where: { shop },
     orderBy: { createdAt: "desc" },
     include: {
-      products: {
-        select: { id: true },
-      },
+      products: { select: { id: true } },
     },
   });
 
@@ -62,14 +71,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `#graphql
         query GetCollections($after: String) {
           collections(first: 250, after: $after) {
-            nodes {
-              id
-              title
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
+            nodes { id title }
+            pageInfo { hasNextPage endCursor }
           }
         }
       `,
@@ -79,10 +82,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const collectionsData = responseData.collections;
 
     for (const collection of collectionsData.nodes) {
-      collections.push({
-        id: collection.id,
-        title: collection.title,
-      });
+      collections.push({ id: collection.id, title: collection.title });
     }
 
     hasNextPage = collectionsData.pageInfo.hasNextPage;
@@ -142,10 +142,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const existing = await db.creatorMapping.findUnique({
       where: {
-        shop_shopifyCollectionId: {
-          shop,
-          shopifyCollectionId,
-        },
+        shop_shopifyCollectionId: { shop, shopifyCollectionId },
       },
     });
 
@@ -156,13 +153,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const responseData: CollectionData = await adminGraphQL<CollectionData>(
       admin,
       `#graphql
-      query GetCollection($id: ID!) {
-        collection(id: $id) {
-          id
-          title
+        query GetCollection($id: ID!) {
+          collection(id: $id) { id title }
         }
-      }
-    `,
+      `,
       { id: shopifyCollectionId },
     );
 
@@ -217,9 +211,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         connectionSecret: mapping.connectionSecret,
       };
     } catch (error) {
-      await db.creatorMapping.delete({
-        where: { id: mapping.id },
-      });
+      await db.creatorMapping.delete({ where: { id: mapping.id } });
 
       logger.error(
         { shop, collectionTitle: nameResult.name, err: error },
@@ -237,24 +229,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "edit") {
     const id = parseId(formData.get("id"));
-    if (id === null) {
-      return { error: "A valid mapping ID is required" };
-    }
+    if (id === null) return { error: "A valid mapping ID is required" };
 
     const discourseUrlRaw = String(formData.get("discourseUrl") ?? "");
     const urlResult = validateDiscourseUrl(discourseUrlRaw);
+    if (!urlResult.ok) return { error: urlResult.error };
 
-    if (!urlResult.ok) {
-      return { error: urlResult.error };
-    }
-
-    const mapping = await db.creatorMapping.findFirst({
-      where: { id, shop },
-    });
-
-    if (!mapping) {
-      return { error: "Mapping not found" };
-    }
+    const mapping = await db.creatorMapping.findFirst({ where: { id, shop } });
+    if (!mapping) return { error: "Mapping not found" };
 
     await db.creatorMapping.update({
       where: { id: mapping.id },
@@ -266,17 +248,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "toggle") {
     const id = parseId(formData.get("id"));
-    if (id === null) {
-      return { error: "A valid mapping ID is required" };
-    }
+    if (id === null) return { error: "A valid mapping ID is required" };
 
-    const mapping = await db.creatorMapping.findFirst({
-      where: { id, shop },
-    });
-
-    if (!mapping) {
-      return { error: "Mapping not found" };
-    }
+    const mapping = await db.creatorMapping.findFirst({ where: { id, shop } });
+    if (!mapping) return { error: "Mapping not found" };
 
     const enabled = !mapping.enabled;
 
@@ -293,38 +268,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "delete") {
     const id = parseId(formData.get("id"));
-    if (id === null) {
-      return { error: "A valid mapping ID is required" };
-    }
+    if (id === null) return { error: "A valid mapping ID is required" };
 
-    const mapping = await db.creatorMapping.findFirst({
-      where: { id, shop },
-    });
+    const mapping = await db.creatorMapping.findFirst({ where: { id, shop } });
+    if (!mapping) return { error: "Mapping not found" };
 
-    if (!mapping) {
-      return { error: "Mapping not found" };
-    }
-
-    await db.creatorMapping.delete({
-      where: { id: mapping.id },
-    });
+    await db.creatorMapping.delete({ where: { id: mapping.id } });
 
     return { success: true, message: "Mapping deleted." };
   }
 
   if (intent === "resync") {
     const id = parseId(formData.get("id"));
-    if (id === null) {
-      return { error: "A valid mapping ID is required" };
-    }
+    if (id === null) return { error: "A valid mapping ID is required" };
 
-    const mapping = await db.creatorMapping.findFirst({
-      where: { id, shop },
-    });
-
-    if (!mapping) {
-      return { error: "Mapping not found" };
-    }
+    const mapping = await db.creatorMapping.findFirst({ where: { id, shop } });
+    if (!mapping) return { error: "Mapping not found" };
 
     try {
       const syncResult = await syncProductMappings(
@@ -390,6 +349,10 @@ export default function MappingsPage() {
         shopify.toast.show(message);
         revalidator.revalidate();
       }
+
+      if ("error" in fetcher.data && fetcher.data.error) {
+        shopify.toast.show(fetcher.data.error, { isError: true });
+      }
     }
 
     previousFetcherState.current = fetcher.state;
@@ -398,12 +361,30 @@ export default function MappingsPage() {
   return (
     <s-page heading="Creator Community Mappings">
       <s-section heading="Add a new mapping">
-        <MappingForm collections={collections} isSubmitting={isSubmitting} />
+        <MappingForm
+          collections={collections}
+          isSubmitting={isSubmitting}
+          fetcher={fetcher}
+        />
       </s-section>
 
       <s-section heading="Existing mappings">
-        <MappingsTable mappings={mappings} isSubmitting={isSubmitting} />
+        <MappingsTable
+          mappings={mappings}
+          isSubmitting={isSubmitting}
+          fetcher={fetcher}
+        />
       </s-section>
     </s-page>
   );
 }
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  Sentry.captureException(error);
+  return boundary.error(error);
+}
+
+export const headers: HeadersFunction = (headersArgs) => {
+  return boundary.headers(headersArgs);
+};
