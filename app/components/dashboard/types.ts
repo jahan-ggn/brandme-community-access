@@ -23,4 +23,5 @@ export type DashboardData = {
   stats: DashboardStats;
   chartData: ChartDataPoint[];
   communityStats: CommunityStat[];
+  hasMappings: boolean;
 };

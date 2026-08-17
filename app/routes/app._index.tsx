@@ -35,6 +35,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     recentLogs,
     groupedCommunityStats,
     uniqueCommunities,
+    mappingCount,
   ] = await Promise.all([
     db.deliveryLog.count({
       where: { shop, eventType: "purchase", status: "delivered" },
@@ -60,12 +61,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       select: { eventType: true, createdAt: true },
     }),
     db.deliveryLog.groupBy({
-      by: ["discourseCommunity", "status"],
+      by: ["discourseCommunity", "eventType", "status"],
       where: {
         shop,
-        status: {
-          in: ["delivered", "refund_delivered", "failed", "refund_failed"],
-        },
+        OR: [
+          { eventType: "purchase", status: "delivered" },
+          { eventType: "refund", status: "refund_delivered" },
+          { eventType: "purchase", status: "failed" },
+          { eventType: "refund", status: "refund_failed" },
+        ],
       },
       _count: { _all: true },
     }),
@@ -74,12 +78,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       select: { discourseUrl: true },
       distinct: ["discourseUrl"],
     }),
+    db.creatorMapping.count({ where: { shop } }),
   ]);
 
   const dayMap = new Map<string, { purchases: number; refunds: number }>();
 
   for (let i = 0; i < CHART_DAYS; i++) {
     const date = new Date(now);
+    date.setUTCHours(0, 0, 0, 0);
     date.setUTCDate(date.getUTCDate() - i);
     const dateKey = date.toISOString().slice(0, 10);
     dayMap.set(dateKey, { purchases: 0, refunds: 0 });
@@ -126,11 +132,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       failedDeliveries: 0,
     };
 
-    if (group.status === "delivered") {
+    if (group.eventType === "purchase" && group.status === "delivered") {
       entry.purchasesDelivered += group._count._all;
-    } else if (group.status === "refund_delivered") {
+    } else if (
+      group.eventType === "refund" &&
+      group.status === "refund_delivered"
+    ) {
       entry.refundsProcessed += group._count._all;
-    } else if (group.status === "failed" || group.status === "refund_failed") {
+    } else if (
+      (group.eventType === "purchase" && group.status === "failed") ||
+      (group.eventType === "refund" && group.status === "refund_failed")
+    ) {
       entry.failedDeliveries += group._count._all;
     }
 
@@ -151,6 +163,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
     chartData,
     communityStats,
+    hasMappings: mappingCount > 0,
   };
 
   return data;
@@ -158,6 +171,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Index() {
   const data = useLoaderData<typeof loader>();
+
+  if (!data.hasMappings) {
+    return (
+      <s-page heading="Welcome to BrandMe Community Access">
+        <s-section heading="Get started">
+          <s-paragraph>
+            Connect your Shopify collections to creator Discourse communities.
+            When a customer purchases a product from a mapped collection, they
+            automatically get access to the corresponding community.
+          </s-paragraph>
+          <s-paragraph>
+            Create your first mapping to start delivering community access
+            through Discourse.
+          </s-paragraph>
+          <s-button href="/app/mappings">Create your first mapping</s-button>
+        </s-section>
+      </s-page>
+    );
+  }
 
   return (
     <s-page heading="BrandMe Community Access">

@@ -1,3 +1,3 @@
-app.quixote.university {
+{$APP_DOMAIN} {
     reverse_proxy app:3000
 }
