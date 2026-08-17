@@ -1,17 +1,17 @@
 import type { ActionFunctionArgs } from "react-router";
+
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { Sentry } from "../utils/sentry.server";
 
+import { Sentry } from "../utils/sentry.server";
+import { enqueueRetry } from "../utils/retry-queue.server";
 import {
   isDuplicateWebhook,
   markWebhookProcessed,
   createDeliveryLog,
 } from "../utils/webhook-helpers.server";
-
 import { forwardToDiscourse } from "../utils/discourse-forwarder.server";
 import { logger } from "../utils/logger.server";
-import { enqueueRetry } from "../utils/retry-queue.server";
 
 type RefundLineItemEntry = {
   product_id: number | string | null;
@@ -28,14 +28,31 @@ type RefundPayload = {
   refund_line_items?: RefundLineItem[] | null;
 };
 
+const EVENT_TYPE = "refund";
+const WEBHOOK_TOPIC = "refunds/create";
+
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload, webhookId } =
     await authenticate.webhook(request);
 
-  logger.info({ topic, shop, webhookId }, "Webhook received");
+  logger.info(
+    {
+      topic,
+      shop,
+      webhookId,
+    },
+    "Webhook received",
+  );
 
   if (await isDuplicateWebhook(webhookId)) {
-    logger.info({ webhookId }, "Duplicate webhook ignored");
+    logger.info(
+      {
+        shop,
+        webhookId,
+      },
+      "Duplicate webhook ignored",
+    );
+
     return new Response();
   }
 
@@ -46,9 +63,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const refundLineItems = refund.refund_line_items ?? [];
 
   if (refundLineItems.length === 0) {
-    logger.info({ refundId, orderId }, "No refund line items, skipping");
+    logger.info(
+      {
+        shop,
+        refundId,
+        orderId,
+        webhookId,
+      },
+      "No refund line items, skipping",
+    );
 
-    await markWebhookProcessed(webhookId, shop, orderId, "refunds/create");
+    await markWebhookProcessed(webhookId, shop, orderId, WEBHOOK_TOPIC);
 
     return new Response();
   }
@@ -80,9 +105,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (productMappings.length === 0) {
       logger.info(
-        { shop, productGid },
+        {
+          shop,
+          refundId,
+          orderId,
+          productId,
+          productGid,
+          webhookId,
+        },
         "No creator mapping found, skipping product",
       );
+
       continue;
     }
 
@@ -95,7 +128,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             orderId,
             productId,
             discourseCommunity: creator.discourseUrl,
-            eventType: "refund",
+            eventType: EVENT_TYPE,
           },
         },
         select: {
@@ -106,9 +139,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (existingRefund?.status === "refund_delivered") {
         logger.info(
-          { shop, orderId, productId, discourseUrl: creator.discourseUrl },
+          {
+            shop,
+            refundId,
+            orderId,
+            productId,
+            creatorMappingId: creator.id,
+            discourseUrl: creator.discourseUrl,
+            webhookId,
+          },
           "Refund already delivered, skipping",
         );
+
         continue;
       }
 
@@ -129,75 +171,71 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (!purchaseDelivery || purchaseDelivery.status !== "delivered") {
         logger.info(
-          { shop, orderId, productId, discourseUrl: creator.discourseUrl },
+          {
+            shop,
+            refundId,
+            orderId,
+            productId,
+            creatorMappingId: creator.id,
+            discourseUrl: creator.discourseUrl,
+            webhookId,
+          },
           "No delivered purchase found, skipping refund",
         );
+
         continue;
       }
 
       const customerEmail = purchaseDelivery.customerEmail;
 
+      /*
+       * Keep the external Discourse call isolated from local database work.
+       *
+       * This prevents a DeliveryLog failure from being mistaken for a failed
+       * Discourse request and unnecessarily creating another retry.
+       */
+      let result;
+
       try {
-        const result = await forwardToDiscourse(
+        result = await forwardToDiscourse(
           creator.discourseUrl,
           creator.connectionSecret,
           {
-            event: "refund",
+            event: EVENT_TYPE,
             email: customerEmail,
             webhookId,
             productId,
             orderId,
           },
         );
-
-        await createDeliveryLog(
-          shop,
-          orderId,
-          customerEmail,
-          productId,
-          creator.discourseUrl,
-          result.success ? "refund_delivered" : "refund_failed",
-          result.error,
-          "refund",
-        );
-
-        if (!result.success) {
-          await enqueueRetry(
-            shop,
-            orderId,
-            customerEmail,
-            productId,
-            creator.discourseUrl,
-            creator.connectionSecret,
-            "refund",
-            webhookId,
-            result.error,
-          );
-          errors.push(
-            `Refund for product ${productId} → ${creator.discourseUrl}: ` +
-              `${result.error ?? "Unknown error"}`,
-          );
-        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
         logger.error(
           {
             shop,
+            refundId,
             orderId,
             productId,
+            creatorMappingId: creator.id,
             discourseUrl: creator.discourseUrl,
+            webhookId,
             err: error,
           },
-          "Refund delivery failed",
+          "Refund delivery threw an exception",
         );
 
         Sentry.captureException(error, {
-          tags: { topic, shop },
+          tags: {
+            topic,
+            shop,
+          },
           extra: {
             webhookId,
+            refundId,
             orderId,
             productId,
+            creatorMappingId: creator.id,
             discourseUrl: creator.discourseUrl,
           },
         });
@@ -210,7 +248,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           creator.discourseUrl,
           "refund_failed",
           message,
-          "refund",
+          EVENT_TYPE,
         );
 
         await enqueueRetry(
@@ -218,38 +256,118 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           orderId,
           customerEmail,
           productId,
-          creator.discourseUrl,
-          creator.connectionSecret,
-          "refund",
+          creator.id,
+          EVENT_TYPE,
           webhookId,
           message,
         );
 
         errors.push(
-          `Refund for product ${productId} → ${creator.discourseUrl}: ` +
-            `${message}`,
+          `Refund for product ${productId} → ${creator.discourseUrl}: ${message}`,
         );
+
+        continue;
       }
+
+      await createDeliveryLog(
+        shop,
+        orderId,
+        customerEmail,
+        productId,
+        creator.discourseUrl,
+        result.success ? "refund_delivered" : "refund_failed",
+        result.error,
+        EVENT_TYPE,
+      );
+
+      if (result.success) {
+        logger.info(
+          {
+            shop,
+            refundId,
+            orderId,
+            productId,
+            creatorMappingId: creator.id,
+            discourseUrl: creator.discourseUrl,
+            webhookId,
+          },
+          "Refund delivered to Discourse",
+        );
+
+        continue;
+      }
+
+      const errorMessage =
+        result.error ?? "Unknown Discourse refund delivery error";
+
+      await enqueueRetry(
+        shop,
+        orderId,
+        customerEmail,
+        productId,
+        creator.id,
+        EVENT_TYPE,
+        webhookId,
+        errorMessage,
+      );
+
+      errors.push(
+        `Refund for product ${productId} → ${creator.discourseUrl}: ${errorMessage}`,
+      );
+
+      logger.warn(
+        {
+          shop,
+          refundId,
+          orderId,
+          productId,
+          creatorMappingId: creator.id,
+          discourseUrl: creator.discourseUrl,
+          webhookId,
+          error: errorMessage,
+        },
+        "Refund delivery failed, queued for retry",
+      );
     }
   }
 
+  /*
+   * Once failed deliveries are safely stored in RetryQueue, the Shopify
+   * webhook itself has been successfully handled.
+   *
+   * Returning 500 here would cause Shopify to retry the entire webhook while
+   * our retry worker is already responsible for retrying Discourse.
+   */
   if (errors.length > 0) {
-    Sentry.captureException(new Error("Partial refund webhook failure"), {
-      tags: { topic, shop },
-      extra: { webhookId, refundId, orderId, errors },
-    });
-
-    logger.error(
-      { shop, refundId, orderId, webhookId, errors },
-      "Partial webhook failure",
+    Sentry.captureException(
+      new Error("Partial refund webhook delivery failure"),
+      {
+        tags: {
+          topic,
+          shop,
+        },
+        extra: {
+          webhookId,
+          refundId,
+          orderId,
+          errors,
+        },
+      },
     );
 
-    return new Response("Webhook processing partially failed", {
-      status: 500,
-    });
+    logger.error(
+      {
+        shop,
+        refundId,
+        orderId,
+        webhookId,
+        errors,
+      },
+      "Refund webhook completed with partial failures; failed deliveries queued for retry",
+    );
   }
 
-  await markWebhookProcessed(webhookId, shop, orderId, "refunds/create");
+  await markWebhookProcessed(webhookId, shop, orderId, WEBHOOK_TOPIC);
 
   return new Response();
 };

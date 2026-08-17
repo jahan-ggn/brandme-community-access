@@ -61,7 +61,7 @@ model ProcessedWebhook {
   id          Int       @id @default(autoincrement())
   webhookId   String    @unique
   shop        String
-  resourceId     String
+  resourceId  String
   eventType   String
   status      String    @default("processed")
   createdAt   DateTime  @default(now())
@@ -97,8 +97,7 @@ model RetryQueue {
   orderId          String
   customerEmail    String
   productId        String
-  discourseUrl    String
-  connectionSecret String
+  creatorMappingId Int
   eventType        String
   attemptCount     Int       @default(0)
   maxAttempts      Int       @default(5)
@@ -107,7 +106,10 @@ model RetryQueue {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  @@unique([webhookId, productId, creatorMappingId, eventType])
+
   @@index([nextRetryAt])
   @@index([shop])
   @@index([webhookId])
+  @@index([creatorMappingId])
 }
