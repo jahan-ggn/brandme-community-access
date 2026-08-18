@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/node";
 
-const dsn = process.env.SENTRY_DSN;
+const dsn = import.meta.env.VITE_SENTRY_DSN;
 const environment = process.env.NODE_ENV ?? "development";
 
 if (dsn) {

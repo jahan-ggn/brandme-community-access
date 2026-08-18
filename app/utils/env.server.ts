@@ -1,12 +1,11 @@
 const REQUIRED_ENV_VARS = [
   "SHOPIFY_API_KEY",
   "SHOPIFY_API_SECRET",
-  "SHOPIFY_APP_URL",
   "SCOPES",
   "RETRY_WORKER_SECRET",
 ] as const;
 
-const OPTIONAL_ENV_VARS = ["SENTRY_DSN", "SHOP_CUSTOM_DOMAIN"] as const;
+const OPTIONAL_ENV_VARS = ["VITE_SENTRY_DSN", "SHOP_CUSTOM_DOMAIN"] as const;
 
 function validateEnv(): void {
   const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);

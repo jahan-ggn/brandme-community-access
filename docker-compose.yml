@@ -1,9 +1,14 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN}
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      SHOPIFY_APP_URL: "https://${APP_DOMAIN}"
 
     volumes:
       - app-data:/app/data
