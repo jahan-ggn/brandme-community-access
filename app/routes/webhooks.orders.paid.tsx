@@ -144,13 +144,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         continue;
       }
 
-      /*
-       * Keep the external Discourse call in its own try/catch.
-       *
-       * This prevents a DeliveryLog database error from being mistaken for
-       * a failed Discourse delivery and accidentally creating a retry for
-       * something that may already have been delivered successfully.
-       */
       let result;
 
       try {
@@ -195,9 +188,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
 
-        /*
-         * The Discourse request itself failed, so this is safe to retry.
-         */
         await createDeliveryLog(
           shop,
           orderId,
@@ -227,12 +217,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         continue;
       }
 
-      /*
-       * Discourse responded normally.
-       *
-       * From this point onward we know whether the delivery succeeded or
-       * failed based on result.success.
-       */
       await createDeliveryLog(
         shop,
         orderId,
@@ -292,13 +276,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  /*
-   * A failed Discourse delivery is not considered a failed Shopify webhook
-   * once it has been safely persisted in our retry queue.
-   *
-   * Returning 500 here would cause Shopify to retry the whole webhook while
-   * our own retry worker is also retrying the failed delivery.
-   */
   if (errors.length > 0) {
     Sentry.captureException(new Error("Partial webhook delivery failure"), {
       tags: {

@@ -324,7 +324,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  // Add this intent block in the action, before the final "Unknown action" return:
   if (intent === "test") {
     const id = parseId(formData.get("id"));
     if (id === null) {

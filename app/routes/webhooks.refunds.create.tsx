@@ -188,12 +188,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const customerEmail = purchaseDelivery.customerEmail;
 
-      /*
-       * Keep the external Discourse call isolated from local database work.
-       *
-       * This prevents a DeliveryLog failure from being mistaken for a failed
-       * Discourse request and unnecessarily creating another retry.
-       */
       let result;
 
       try {
@@ -331,13 +325,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  /*
-   * Once failed deliveries are safely stored in RetryQueue, the Shopify
-   * webhook itself has been successfully handled.
-   *
-   * Returning 500 here would cause Shopify to retry the entire webhook while
-   * our retry worker is already responsible for retrying Discourse.
-   */
   if (errors.length > 0) {
     Sentry.captureException(
       new Error("Partial refund webhook delivery failure"),
