@@ -3,7 +3,6 @@ import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { logger } from "../utils/logger.server";
-import { Sentry } from "../utils/sentry.server";
 import {
   isDuplicateWebhook,
   markWebhookProcessed,
@@ -96,10 +95,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { shop, productGid },
       "No admin session for products/update, cannot sync",
     );
-    Sentry.captureException(new Error("No admin session for products/update"), {
-      tags: { topic, shop },
-      extra: { webhookId, productGid },
-    });
     return new Response("Unable to process product update", { status: 500 });
   }
 
@@ -187,10 +182,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { shop, productGid, webhookId, err: error },
       "Failed to process products/update webhook",
     );
-    Sentry.captureException(error, {
-      tags: { topic, shop },
-      extra: { webhookId, productGid },
-    });
     return new Response("Webhook processing failed", { status: 500 });
   }
 

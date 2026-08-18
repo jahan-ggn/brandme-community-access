@@ -1,4 +1,3 @@
-import { Sentry } from "./utils/sentry.server";
 import { PassThrough } from "stream";
 import { renderToPipeableStream } from "react-dom/server";
 import { ServerRouter } from "react-router";
@@ -45,7 +44,6 @@ export default async function handleRequest(
         },
         onError(error) {
           responseStatusCode = 500;
-          Sentry.captureException(error);
           logger.error({ err: error, url: request.url }, "SSR render error");
         },
       },

@@ -2,7 +2,6 @@ import db from "../db.server";
 import { forwardToDiscourse } from "./discourse-forwarder.server";
 import { createDeliveryLog } from "./webhook-helpers.server";
 import { logger } from "./logger.server";
-import { Sentry } from "./sentry.server";
 import { MAX_RETRY_ATTEMPTS } from "./retry-config.server";
 
 const BASE_DELAY_MS = 30_000;
@@ -115,22 +114,6 @@ export async function processRetryQueue(): Promise<void> {
           },
         });
 
-        const error = new Error(
-          `Creator mapping ${item.creatorMappingId} no longer exists`,
-        );
-
-        Sentry.captureException(error, {
-          tags: {
-            shop: item.shop,
-          },
-          extra: {
-            orderId: item.orderId,
-            productId: item.productId,
-            creatorMappingId: item.creatorMappingId,
-            webhookId: item.webhookId,
-          },
-        });
-
         logger.error(
           {
             shop: item.shop,
@@ -218,22 +201,6 @@ export async function processRetryQueue(): Promise<void> {
           },
         });
 
-        Sentry.captureException(new Error("Retry exhausted max attempts"), {
-          tags: {
-            shop: item.shop,
-          },
-          extra: {
-            orderId: item.orderId,
-            productId: item.productId,
-            creatorMappingId: item.creatorMappingId,
-            discourseUrl: creatorMapping.discourseUrl,
-            webhookId: item.webhookId,
-            attemptCount: nextAttempt,
-            maxAttempts: item.maxAttempts,
-            lastError: result.error,
-          },
-        });
-
         logger.error(
           {
             shop: item.shop,
@@ -287,21 +254,6 @@ export async function processRetryQueue(): Promise<void> {
           },
         });
 
-        Sentry.captureException(error, {
-          tags: {
-            shop: item.shop,
-          },
-          extra: {
-            orderId: item.orderId,
-            productId: item.productId,
-            creatorMappingId: item.creatorMappingId,
-            webhookId: item.webhookId,
-            attemptCount: nextAttempt,
-            maxAttempts: item.maxAttempts,
-            lastError: message,
-          },
-        });
-
         logger.error(
           {
             shop: item.shop,
@@ -327,19 +279,6 @@ export async function processRetryQueue(): Promise<void> {
           attemptCount: nextAttempt,
           lastError: message,
           nextRetryAt: new Date(Date.now() + calculateBackoff(nextAttempt)),
-        },
-      });
-
-      Sentry.captureException(error, {
-        tags: {
-          shop: item.shop,
-        },
-        extra: {
-          orderId: item.orderId,
-          productId: item.productId,
-          creatorMappingId: item.creatorMappingId,
-          webhookId: item.webhookId,
-          attempt: nextAttempt,
         },
       });
 

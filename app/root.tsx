@@ -1,4 +1,3 @@
-import "./utils/sentry.client";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import type { MetaFunction } from "react-router";
 

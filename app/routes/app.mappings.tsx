@@ -24,7 +24,6 @@ import {
   validateDiscourseUrl,
 } from "../utils/validation.server";
 import { logger } from "../utils/logger.server";
-import { Sentry } from "../utils/sentry";
 
 import { MappingForm } from "../components/mappings/MappingForm";
 import { MappingsTable } from "../components/mappings/MappingsTable";
@@ -418,7 +417,6 @@ export default function MappingsPage() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
-  Sentry.captureException(error);
   return boundary.error(error);
 }
 

@@ -16,8 +16,6 @@ COPY . .
 
 RUN npx prisma generate
 
-ARG VITE_SENTRY_DSN
-ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 RUN npm run build
 
 EXPOSE 3000

@@ -5,7 +5,7 @@ const REQUIRED_ENV_VARS = [
   "RETRY_WORKER_SECRET",
 ] as const;
 
-const OPTIONAL_ENV_VARS = ["VITE_SENTRY_DSN", "SHOP_CUSTOM_DOMAIN"] as const;
+const OPTIONAL_ENV_VARS = ["SHOP_CUSTOM_DOMAIN"] as const;
 
 function validateEnv(): void {
   const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);

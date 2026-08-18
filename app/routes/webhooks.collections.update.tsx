@@ -7,7 +7,6 @@ import {
 import { syncProductMappings } from "../utils/product-sync.server";
 import db from "../db.server";
 import { logger } from "../utils/logger.server";
-import { Sentry } from "../utils/sentry.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload, webhookId, admin } =
@@ -48,10 +47,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { shop, collectionGid },
       "No admin session, collection sync incomplete",
     );
-    Sentry.captureException(new Error("No admin session for collection sync"), {
-      tags: { topic, shop },
-      extra: { webhookId, collectionGid },
-    });
 
     return new Response("Unable to sync collection", { status: 500 });
   }
@@ -79,10 +74,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { shop, collectionGid, webhookId, err: error },
       "Collection sync failed",
     );
-    Sentry.captureException(error, {
-      tags: { topic, shop },
-      extra: { webhookId, collectionGid },
-    });
     return new Response("Collection sync failed", { status: 500 });
   }
 
