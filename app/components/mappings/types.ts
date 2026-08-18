@@ -7,6 +7,7 @@ export type MappingData = {
   productCount: number;
   createdAt: Date;
   connectionSecret: string;
+  pluginStatus: string;
 };
 
 export type CollectionOption = {

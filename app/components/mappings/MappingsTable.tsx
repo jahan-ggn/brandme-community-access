@@ -24,6 +24,7 @@ export function MappingsTable({
         <s-table-header listSlot="secondary">Community</s-table-header>
         <s-table-header listSlot="inline">Products</s-table-header>
         <s-table-header listSlot="inline">Status</s-table-header>
+        <s-table-header listSlot="inline">Plugin</s-table-header>
         <s-table-header listSlot="inline">Created</s-table-header>
         <s-table-header listSlot="inline">Actions</s-table-header>
       </s-table-header-row>
@@ -50,6 +51,26 @@ export function MappingsTable({
             </s-table-cell>
 
             <s-table-cell>
+              <s-badge
+                tone={
+                  mapping.pluginStatus === "connected"
+                    ? "success"
+                    : mapping.pluginStatus === "not_found"
+                      ? "critical"
+                      : "neutral"
+                }
+              >
+                {mapping.pluginStatus === "connected"
+                  ? "Connected"
+                  : mapping.pluginStatus === "not_found"
+                    ? "Not Found"
+                    : mapping.pluginStatus === "error"
+                      ? "Error"
+                      : "Unknown"}
+              </s-badge>
+            </s-table-cell>
+
+            <s-table-cell>
               {new Date(mapping.createdAt).toLocaleDateString("en-GB")}
             </s-table-cell>
 
@@ -57,6 +78,17 @@ export function MappingsTable({
               <div
                 style={{ display: "flex", gap: "8px", whiteSpace: "nowrap" }}
               >
+                <fetcher.Form method="post" style={{ display: "inline" }}>
+                  <input type="hidden" name="intent" value="test" />
+                  <input type="hidden" name="id" value={mapping.id} />
+                  <s-button
+                    type="submit"
+                    variant="tertiary"
+                    disabled={isSubmitting}
+                  >
+                    Test
+                  </s-button>
+                </fetcher.Form>
                 <s-button
                   variant="tertiary"
                   onClick={() => {

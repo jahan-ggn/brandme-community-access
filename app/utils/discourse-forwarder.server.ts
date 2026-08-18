@@ -75,3 +75,56 @@ export async function forwardToDiscourse(
     }
   });
 }
+
+export async function checkDiscourseHealth(
+  discourseUrl: string,
+): Promise<{ ok: boolean; status: string; error?: string }> {
+  const endpoint = `${discourseUrl.replace(/\/+$/, "")}/brandme/health`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const response = await fetch(endpoint, {
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: "error",
+        error: `HTTP ${response.status}`,
+      };
+    }
+
+    const body = await response.json();
+
+    if (
+      body?.status === "ok" &&
+      body?.plugin === "discourse-brandme-community-access"
+    ) {
+      return { ok: true, status: "connected" };
+    }
+
+    return {
+      ok: false,
+      status: "error",
+      error: "Unexpected response from health endpoint",
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        ok: false,
+        status: "not_found",
+        error: "Request timed out after 3 seconds",
+      };
+    }
+
+    return {
+      ok: false,
+      status: "not_found",
+      error: error instanceof Error ? error.message : "Connection failed",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}

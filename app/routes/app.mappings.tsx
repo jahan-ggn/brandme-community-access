@@ -17,6 +17,7 @@ import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import { syncProductMappings } from "../utils/product-sync.server";
 import { adminGraphQL } from "../utils/api.server";
+import { checkDiscourseHealth } from "../utils/discourse-forwarder.server";
 import {
   parseId,
   validateCollectionName,
@@ -107,6 +108,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       productCount: mapping.products.length,
       createdAt: mapping.createdAt,
       connectionSecret: mapping.connectionSecret,
+      pluginStatus: mapping.pluginStatus,
     })),
     collections: collections.map((collection) => ({
       ...collection,
@@ -320,6 +322,43 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             : "Sync failed",
       };
     }
+  }
+
+  // Add this intent block in the action, before the final "Unknown action" return:
+  if (intent === "test") {
+    const id = parseId(formData.get("id"));
+    if (id === null) {
+      return { error: "A valid mapping ID is required" };
+    }
+
+    const mapping = await db.creatorMapping.findFirst({
+      where: { id, shop },
+    });
+
+    if (!mapping) {
+      return { error: "Mapping not found" };
+    }
+
+    const result = await checkDiscourseHealth(mapping.discourseUrl);
+
+    await db.creatorMapping.update({
+      where: { id: mapping.id },
+      data: { pluginStatus: result.status },
+    });
+
+    if (result.ok) {
+      return {
+        success: true,
+        message: `Plugin is connected at ${mapping.discourseUrl}`,
+        pluginStatus: result.status,
+      };
+    }
+
+    return {
+      success: true,
+      message: `Plugin check failed: ${result.error}`,
+      pluginStatus: result.status,
+    };
   }
 
   return { error: "Unknown action" };
