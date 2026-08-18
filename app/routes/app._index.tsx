@@ -12,22 +12,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  const [groupedCommunityStats, mappingCount] = await Promise.all([
-    db.deliveryLog.groupBy({
-      by: ["discourseCommunity", "eventType", "status"],
-      where: {
-        shop,
-        OR: [
-          { eventType: "purchase", status: "delivered" },
-          { eventType: "refund", status: "refund_delivered" },
-          { eventType: "purchase", status: "failed" },
-          { eventType: "refund", status: "refund_failed" },
-        ],
-      },
-      _count: { _all: true },
-    }),
-    db.creatorMapping.count({ where: { shop } }),
-  ]);
+  const [groupedCommunityStats, mappingCount, enabledMappings] =
+    await Promise.all([
+      db.deliveryLog.groupBy({
+        by: ["discourseCommunity", "eventType", "status"],
+        where: {
+          shop,
+          OR: [
+            { eventType: "purchase", status: "delivered" },
+            { eventType: "refund", status: "refund_delivered" },
+            { eventType: "purchase", status: "failed" },
+            { eventType: "refund", status: "refund_failed" },
+          ],
+        },
+        _count: { _all: true },
+      }),
+      db.creatorMapping.count({ where: { shop } }),
+      db.creatorMapping.findMany({
+        where: { shop, enabled: true },
+        select: { discourseUrl: true },
+        distinct: ["discourseUrl"],
+      }),
+    ]);
 
   const communityMap = new Map<
     string,
@@ -37,6 +43,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       failedDeliveries: number;
     }
   >();
+
+  for (const mapping of enabledMappings) {
+    if (!communityMap.has(mapping.discourseUrl)) {
+      communityMap.set(mapping.discourseUrl, {
+        purchasesDelivered: 0,
+        refundsProcessed: 0,
+        failedDeliveries: 0,
+      });
+    }
+  }
 
   for (const group of groupedCommunityStats) {
     const community = group.discourseCommunity;

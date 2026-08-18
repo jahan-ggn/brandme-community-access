@@ -31,7 +31,9 @@ export function CommunityTable({
         {communities.map((community) => (
           <s-table-row key={community.community}>
             <s-table-cell>
-              <strong>{community.community}</strong>
+              <s-link href={community.community} target="_blank">
+                {community.community.replace(/^https?:\/\//, "")}
+              </s-link>
             </s-table-cell>
 
             <s-table-cell>
