@@ -354,8 +354,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     return {
-      success: true,
-      message: `Plugin check failed: ${result.error}`,
+      error: `Plugin check failed: ${result.error}`,
       pluginStatus: result.status,
     };
   }

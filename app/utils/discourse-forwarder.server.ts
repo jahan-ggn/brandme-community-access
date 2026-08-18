@@ -92,7 +92,10 @@ export async function checkDiscourseHealth(
       return {
         ok: false,
         status: "error",
-        error: `HTTP ${response.status}`,
+        error:
+          response.status === 404
+            ? "Plugin not found — ensure it's installed and enabled in Discourse admin settings"
+            : `HTTP ${response.status}`,
       };
     }
 
@@ -115,7 +118,8 @@ export async function checkDiscourseHealth(
       return {
         ok: false,
         status: "not_found",
-        error: "Request timed out after 3 seconds",
+        error:
+          "Could not reach Discourse — check the URL and that the site is online",
       };
     }
 

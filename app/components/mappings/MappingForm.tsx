@@ -29,7 +29,11 @@ export function MappingForm({
   }, [fetcher.state, fetcher.data, formData]);
 
   const error =
-    fetcher.data && "error" in fetcher.data ? fetcher.data.error : undefined;
+    fetcher.data &&
+    "error" in fetcher.data &&
+    formData?.get("intent") === "create"
+      ? fetcher.data.error
+      : undefined;
 
   return (
     <>
