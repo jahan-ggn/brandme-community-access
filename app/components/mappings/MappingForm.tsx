@@ -12,6 +12,8 @@ export function MappingForm({
   fetcher: ReturnType<typeof useFetcher<MappingAction>>;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const selectRef = useRef<React.ElementRef<"s-select">>(null);
+  const urlRef = useRef<React.ElementRef<"s-text-field">>(null);
 
   const formData = fetcher.formData as FormData | undefined;
   const isCreating = isSubmitting && formData?.get("intent") === "create";
@@ -25,58 +27,47 @@ export function MappingForm({
       formData?.get("intent") === "create"
     ) {
       formRef.current?.reset();
+      if (selectRef.current) selectRef.current.value = "";
+      if (urlRef.current) urlRef.current.value = "";
     }
   }, [fetcher.state, fetcher.data, formData]);
 
-  const error =
-    fetcher.data &&
-    "error" in fetcher.data &&
-    formData?.get("intent") === "create"
-      ? fetcher.data.error
-      : undefined;
-
   return (
-    <>
-      {error && (
-        <s-banner tone="critical">
-          <s-paragraph>{error}</s-paragraph>
-        </s-banner>
-      )}
+    <fetcher.Form ref={formRef} method="post">
+      <input type="hidden" name="intent" value="create" />
 
-      <fetcher.Form ref={formRef} method="post">
-        <input type="hidden" name="intent" value="create" />
+      <s-stack direction="block" gap="base">
+        <s-select
+          ref={selectRef}
+          name="shopifyCollectionId"
+          label="Shopify Collection"
+          placeholder="Select a collection…"
+          required
+        >
+          {collections.map((collection) => (
+            <s-option
+              key={collection.id}
+              value={collection.id}
+              disabled={collection.alreadyMapped}
+            >
+              {collection.title}
+              {collection.alreadyMapped ? " (already mapped)" : ""}
+            </s-option>
+          ))}
+        </s-select>
 
-        <s-stack direction="block" gap="base">
-          <s-select
-            name="shopifyCollectionId"
-            label="Shopify Collection"
-            placeholder="Select a collection…"
-            required
-          >
-            {collections.map((collection) => (
-              <s-option
-                key={collection.id}
-                value={collection.id}
-                disabled={collection.alreadyMapped}
-              >
-                {collection.title}
-                {collection.alreadyMapped ? " (already mapped)" : ""}
-              </s-option>
-            ))}
-          </s-select>
+        <s-text-field
+          ref={urlRef}
+          name="discourseUrl"
+          label="Discourse Community URL"
+          placeholder="https://community.example.com"
+          required
+        />
 
-          <s-text-field
-            name="discourseUrl"
-            label="Discourse Community URL"
-            placeholder="https://community.example.com"
-            required
-          />
-
-          <s-button type="submit" disabled={isCreating}>
-            {isCreating ? "Creating…" : "Create mapping"}
-          </s-button>
-        </s-stack>
-      </fetcher.Form>
-    </>
+        <s-button type="submit" disabled={isCreating}>
+          {isCreating ? "Creating…" : "Create mapping"}
+        </s-button>
+      </s-stack>
+    </fetcher.Form>
   );
 }
