@@ -1,8 +1,15 @@
 {$APP_DOMAIN} {
+    root * /etc/caddy/errors
+
+    handle {
+        reverse_proxy app:3000 {
+            lb_try_duration 2s
+            lb_try_interval 250ms
+        }
+    }
+
     handle_errors {
-        root * /etc/caddy/errors
         rewrite * /502.html
         file_server
     }
-    reverse_proxy app:3000
 }
