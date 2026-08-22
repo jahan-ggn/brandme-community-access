@@ -60,7 +60,7 @@ services:
           echo "$$(date -Iseconds) Running retry worker..."
 
           if ! curl --fail --silent --show-error \
-            -X POST "$$APP_URL/api.retry" \
+            -X POST "$$APP_URL/api/retry" \
             -H "Authorization: Bearer $$RETRY_WORKER_SECRET"; then
             echo "$$(date -Iseconds) ERROR: Retry worker request failed" >&2
           fi
