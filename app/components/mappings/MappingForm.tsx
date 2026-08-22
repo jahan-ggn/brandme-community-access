@@ -4,7 +4,6 @@ import type { CollectionOption, MappingAction } from "./types";
 
 export function MappingForm({
   collections,
-  isSubmitting,
   fetcher,
 }: {
   collections: CollectionOption[];
@@ -16,21 +15,27 @@ export function MappingForm({
   const urlRef = useRef<React.ElementRef<"s-text-field">>(null);
 
   const formData = fetcher.formData as FormData | undefined;
-  const isCreating = isSubmitting && formData?.get("intent") === "create";
+  const isCreating =
+    fetcher.state !== "idle" && formData?.get("intent") === "create";
 
   useEffect(() => {
     if (
       fetcher.state === "idle" &&
       fetcher.data &&
       "success" in fetcher.data &&
-      fetcher.data.success &&
-      formData?.get("intent") === "create"
+      fetcher.data.success
     ) {
       formRef.current?.reset();
-      if (selectRef.current) selectRef.current.value = "";
-      if (urlRef.current) urlRef.current.value = "";
+
+      if (selectRef.current) {
+        selectRef.current.value = "";
+      }
+
+      if (urlRef.current) {
+        urlRef.current.value = "";
+      }
     }
-  }, [fetcher.state, fetcher.data, formData]);
+  }, [fetcher.state, fetcher.data]);
 
   return (
     <fetcher.Form ref={formRef} method="post">
