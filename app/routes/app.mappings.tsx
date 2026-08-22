@@ -413,25 +413,6 @@ export default function MappingsPage() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
-
-  if (
-    error &&
-    typeof error === "object" &&
-    "status" in error &&
-    (error as { status: number }).status === 502
-  ) {
-    return (
-      <s-page>
-        <s-section heading="Temporarily Unavailable">
-          <s-paragraph>
-            BrandMe Community Access is being updated. Please check back in a
-            few minutes.
-          </s-paragraph>
-        </s-section>
-      </s-page>
-    );
-  }
-
   return boundary.error(error);
 }
 

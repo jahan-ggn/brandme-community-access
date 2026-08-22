@@ -21,4 +21,5 @@ export type MappingAction = {
   success?: boolean;
   message?: string;
   connectionSecret?: string;
+  pluginStatus?: string;
 };

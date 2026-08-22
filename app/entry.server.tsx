@@ -6,9 +6,6 @@ import { type EntryContext } from "react-router";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
 import { logger } from "./utils/logger.server";
-import { registerShutdownHandlers } from "./utils/shutdown.server";
-
-registerShutdownHandlers();
 
 export const streamTimeout = 5000;
 
