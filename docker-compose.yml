@@ -34,9 +34,6 @@ services:
       - ./502.html:/etc/caddy/errors/502.html:ro
       - caddy-data:/data
       - caddy-config:/config
-    depends_on:
-      app:
-        condition: service_healthy
 
   retry-worker:
     image: curlimages/curl:8.16.0
