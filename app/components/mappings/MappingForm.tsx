@@ -7,7 +7,6 @@ export function MappingForm({
   fetcher,
 }: {
   collections: CollectionOption[];
-  isSubmitting: boolean;
   fetcher: ReturnType<typeof useFetcher<MappingAction>>;
 }) {
   const formRef = useRef<HTMLFormElement>(null);

@@ -397,11 +397,7 @@ export default function MappingsPage() {
   return (
     <s-page heading="Creator Community Mappings">
       <s-section heading="Add a new mapping">
-        <MappingForm
-          collections={collections}
-          isSubmitting={isSubmitting}
-          fetcher={fetcher}
-        />
+        <MappingForm collections={collections} fetcher={fetcher} />
       </s-section>
 
       <s-section heading="Existing mappings">
