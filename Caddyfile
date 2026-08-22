@@ -1,10 +1,8 @@
 {$APP_DOMAIN} {
-    reverse_proxy app:3000 {
-        @error status 502 503
-        handle_response @error {
-            root * /etc/caddy/errors
-            rewrite * /502.html
-            file_server
-        }
+    handle_errors {
+        root * /etc/caddy/errors
+        rewrite * /502.html
+        file_server
     }
+    reverse_proxy app:3000
 }
